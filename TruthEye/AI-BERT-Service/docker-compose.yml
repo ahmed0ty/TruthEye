@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  sbert-service:
+    image: sentence-transformers-serving
+    build:
+      context: .
+      dockerfile: Dockerfile.sbert
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G

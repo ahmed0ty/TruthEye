@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.5s ease-out both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-blob: blob 14s ease-in-out infinite;
+  --animate-pop: pop 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
+  }
+  @keyframes blob {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -40px) scale(1.1); }
+    66% { transform: translate(-25px, 25px) scale(0.95); }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.95) translateY(-6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+html { scroll-behavior: smooth; }
+
+::selection { background: #c7d2fe; color: #1e1b4b; }
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  color-scheme: dark;
+  --color-slate-50: #0d1a2b;
+  --color-slate-100: #15253c;
+  --color-slate-200: #223550;
+  --color-slate-300: #34496b;
+  --color-slate-600: #b4c0d0;
+  --color-slate-700: #cbd5e1;
+}
+
+/* Navy surfaces (sidebar, banners) keep light text tones */
+.dark [class*="bg-[#0A2540]"],
+.dark [class*="bg-slate-950"] {
+  --color-slate-300: #cbd5e1;
+}
+
+.dark body { background-color: #0a1422; color: #e2e8f0; }
+.dark .bg-white { background-color: #0f1c30; }
+.dark .bg-white\/80,
+.dark .bg-white\/90 { background-color: rgb(15 28 48 / 0.85); }
+.dark .bg-\[\#F6F8FA\] { background-color: #0a1422; }
+.dark .text-\[\#0A2540\] { color: #e8eef6; }
+.dark .text-slate-900 { color: #f1f5f9; }
+.dark .text-slate-800 { color: #e2e8f0; }
+
+/* Tinted badges / panels */
+.dark .bg-teal-50,
+.dark .bg-teal-50\/50 { background-color: rgb(20 184 166 / 0.12); }
+.dark .bg-teal-100 { background-color: rgb(20 184 166 / 0.2); }
+.dark .bg-emerald-50 { background-color: rgb(16 185 129 / 0.12); }
+.dark .bg-red-50 { background-color: rgb(239 68 68 / 0.12); }
+.dark .bg-amber-50 { background-color: rgb(245 158 11 / 0.12); }
+.dark .bg-sky-50 { background-color: rgb(14 165 233 / 0.12); }
+.dark .bg-violet-50 { background-color: rgb(139 92 246 / 0.14); }
+.dark .hover\:bg-teal-50:hover,
+.dark .hover\:bg-teal-100:hover { background-color: rgb(20 184 166 / 0.2); }
+.dark .hover\:bg-red-50:hover { background-color: rgb(239 68 68 / 0.18); }
+
+/* Text on tinted badges */
+.dark .text-teal-700,
+.dark .text-teal-800,
+.dark .text-teal-900 { color: #5eead4; }
+.dark .text-emerald-600,
+.dark .text-emerald-700 { color: #6ee7b7; }
+.dark .text-red-600,
+.dark .text-red-700 { color: #fca5a5; }
+.dark .text-amber-700,
+.dark .text-amber-800 { color: #fcd34d; }
+.dark .text-sky-700,
+.dark .text-sky-800 { color: #7dd3fc; }
+.dark .text-violet-700 { color: #c4b5fd; }
+
+/* Mobile: 16px inputs stop iOS Safari from zooming on focus */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px; }
+}
+@keyframes grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.grow-up { transform-origin: bottom; animation: grow-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.grow-x { transform-origin: left; animation: grow-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+
+
+/* page + table row entrance animations */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-page-in { animation: page-in .45s cubic-bezier(.22, 1, .36, 1) both; }
+.animate-row-in  { animation: row-in .35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in, .animate-row-in { animation: none; }
+}
