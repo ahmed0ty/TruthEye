@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
+
+# CPU-only torch: أصغر بكتير وأسرع في التحميل
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install sentence-transformers flask requests numpy
+
+# تحميل الموديل وقت الـ build علشان أول طلب ما يستناش
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
+
+COPY sbert_server.py .
+
+EXPOSE 8000
+
+CMD ["python", "sbert_server.py"]
