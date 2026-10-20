@@ -365,3 +365,5 @@ FodyWeavers.xsd
 wwwroot/uploads/
 
 App_Data/
+appsettings.Production.json
+publish/
