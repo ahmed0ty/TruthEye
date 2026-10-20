@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -36,7 +36,7 @@ function ProctorForm({ editing, onDone }: { editing: Proctor | null; onDone: () 
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(editing ? base : createSchema) });
+  } = useForm<FieldValues>({ resolver: zodResolver(editing ? base : createSchema) as unknown as Resolver<FieldValues> });
 
   useEffect(() => {
     reset(
