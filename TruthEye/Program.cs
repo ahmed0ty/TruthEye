@@ -50,17 +50,17 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-options.TokenValidationParameters = new TokenValidationParameters
-{
-    ValidateIssuer = true,
-    ValidateAudience = true,
-    ValidateLifetime = true,
-    ValidateIssuerSigningKey = true,
-    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-    ValidAudience = builder.Configuration["Jwt:Audience"],
-    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
-    ClockSkew = TimeSpan.FromSeconds(30)
-};
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        ClockSkew = TimeSpan.FromSeconds(30)
+    };
 
     // السماح لـ SignalR بقراءة الـ token من الـ query string
     options.Events = new JwtBearerEvents
@@ -110,12 +110,22 @@ builder.Services.AddHostedService<SessionExpiryWorker>();
 builder.Services.AddSingleton<IEvidenceStore, LocalEvidenceStore>();
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddHostedService<EvidenceRetentionWorker>();
+
+// CORS: ONE AddCors call. The origins below are always allowed, plus anything listed in Cors:Origins.
+var configuredOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? Array.Empty<string>();
+
+var corsOrigins = configuredOrigins
+    .Concat(new[] { "http://localhost:3000", "https://truth-eye-r4na-seven.vercel.app" })
+    .Select(o => o.Trim().TrimEnd('/'))
+    .Where(o => o.Length > 0)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
-              ?? new[] { "http://localhost:3000" })
+        policy.WithOrigins(corsOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials()
@@ -173,43 +183,6 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
                      | ForwardedHeaders.XForwardedProto
 });
 
-// Seed Super Admin
-//using (var scope = app.Services.CreateScope())
-//{
-//    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-//    if (!await context.SuperAdmins.AnyAsync())
-//    {
-//        var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SuperAdmin");
-//        if (role == null)
-//        {
-//            role = new Role { Name = "SuperAdmin" };
-//            context.Roles.Add(role);
-//            await context.SaveChangesAsync();
-//        }
-
-//        var admin = new SuperAdmin
-//        {
-//            FirstName = "Super",
-//            LastName = "Admin",
-//            Email = "admin@examproctoring.com",
-//            NationalId = "00000000000000",
-//            PhoneNumber = "+201000000000",
-//            CreatedAt = DateTime.UtcNow,
-//            IsActive = true,
-//            TotalActionsPerformed = 0,
-//            ProfileImage = "default-profile.png",
-//            RoleId = role.Id
-//        };
-
-//        var passwordHasher = new PasswordHasher<SuperAdmin>();
-//        admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123456");
-
-//        context.SuperAdmins.Add(admin);
-//        await context.SaveChangesAsync();
-//    }
-//}
-
 app.UseExceptionHandlingMiddleware();
 
 if (app.Environment.IsDevelopment())
@@ -218,14 +191,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// CORS must run before the HTTPS redirect: a browser rejects any redirect on a preflight request
+app.UseCors("AllowAll");
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseSerilogRequestLogging();
-app.UseCors("AllowAll");
 
 // Authentication & Authorization middleware - ORDER IS IMPORTANT!
 app.UseAuthentication();
 app.UseAuthorization();
+
+// TEMPORARY checks: remove both lines once CORS works, then publish again
+app.MapGet("/version", () => "cors-fix-v2");
+app.MapGet("/cors-debug", () => string.Join(" | ", corsOrigins));
 
 app.MapHealthChecks("/health");
 app.MapHub<ChatHub>("/hubs/chat");
