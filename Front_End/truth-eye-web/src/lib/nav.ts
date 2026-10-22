@@ -23,13 +23,12 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "AI Settings", href: "/admin/ai-config", icon: Settings },
   ],
   Admin: [
-    { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { label: "Home", href: "/admin", icon: LayoutDashboard },
     { label: "Students", href: "/admin/students", icon: Users },
     { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
     { label: "Proctors", href: "/admin/proctors", icon: ScanEye },
     { label: "Departments", href: "/admin/departments", icon: Building2 },
     { label: "Courses", href: "/admin/courses", icon: BookOpen },
-    { label: "Reports", href: "/admin/reports", icon: BarChart3, soon: true },
     { label: "Messages", href: "/chat", icon: MessageSquare },
   ],
   Doctor: [
@@ -40,7 +39,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "Support", href: "/doctor/support", icon: LifeBuoy },
   ],
   Student: [
-    { label: "Dashboard", href: "/student", icon: LayoutDashboard },
+    { label: "Home", href: "/student", icon: LayoutDashboard },
     { label: "Available Exams", href: "/student/exams", icon: ClipboardList },
     { label: "My History", href: "/student/history", icon: History },
     { label: "Reports", href: "/student/reports", icon: FileText },
@@ -55,7 +54,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   Support: [
     { label: "Home", href: "/support", icon: LayoutDashboard },
-    { label: "Messages", href: "/chat", icon: MessageSquare },
     { label: "Tickets", href: "/support/tickets", icon: Ticket },
+    { label: "Messages", href: "/chat", icon: MessageSquare },
   ],
 };
