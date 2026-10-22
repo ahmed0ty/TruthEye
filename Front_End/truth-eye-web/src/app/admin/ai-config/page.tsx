@@ -1,115 +1,164 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
-import { Info } from "lucide-react";
-import { DataTable } from "@/components/ui/data-table";
-import { SubmitButton, TextField } from "@/components/ui/form-fields";
-import { Modal } from "@/components/ui/modal";
+import { Camera, Loader2, ShieldAlert, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { AddButton, RowActions } from "@/components/ui/row-actions";
+import { ErrorState } from "@/components/ui/states";
 import { adminApi } from "@/lib/api/admin";
 import { fmtDateTime } from "@/lib/format";
 import type { AiConfig } from "@/types/admin";
+import type { LucideIcon } from "lucide-react";
 
-const schema = z.object({
-  parameterName: z.string().trim().min(2, "Required").max(100),
-  value: z.string().trim().min(1, "Required").max(500),
-  threshold: z.coerce.number().min(0, "0 to 1").max(1, "0 to 1"),
-});
+interface SettingDef {
+  name: string;
+  title: string;
+  desc: string;
+  unit: string;
+  fallback: number;
+  min: number;
+  max: number;
+  icon: LucideIcon;
+}
 
-function ConfigForm({ editing, onDone }: { editing: AiConfig | null; onDone: () => void }) {
+// Same names, defaults and limits as the backend (SettingKeys / SettingsService)
+const SETTINGS: SettingDef[] = [
+  {
+    name: "NoFaceSeconds",
+    title: "No face detected",
+    desc: "How many seconds a student can be out of the camera before a violation is recorded.",
+    unit: "seconds",
+    fallback: 3,
+    min: 2,
+    max: 30,
+    icon: Camera,
+  },
+  {
+    name: "MultipleFacesSeconds",
+    title: "More than one face",
+    desc: "How many seconds an extra face can stay in the camera before a violation is recorded.",
+    unit: "seconds",
+    fallback: 2,
+    min: 2,
+    max: 30,
+    icon: Users,
+  },
+  {
+    name: "MaxViolationsBeforeFlag",
+    title: "Violations before flagging",
+    desc: "After this many recorded violations in one session, proctors get a notification. Set 0 to disable.",
+    unit: "violations",
+    fallback: 8,
+    min: 0,
+    max: 1000,
+    icon: ShieldAlert,
+  },
+];
+
+function SettingCard({ def, current }: { def: SettingDef; current?: AiConfig }) {
   const qc = useQueryClient();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm({ resolver: zodResolver(schema) });
-
-  useEffect(() => {
-    reset(
-      editing
-        ? { parameterName: editing.parameterName ?? "", value: editing.value ?? "", threshold: editing.threshold }
-        : { parameterName: "", value: "", threshold: 0.7 }
-    );
-  }, [editing, reset]);
+  const saved = current?.value != null && current.value !== "" ? Number(current.value) : def.fallback;
+  const [value, setValue] = useState(String(saved));
+  const [error, setError] = useState("");
+  const Icon = def.icon;
 
   const save = useMutation({
-    mutationFn: (v: z.infer<typeof schema>) => adminApi.saveAiConfig(v),
+    mutationFn: (n: number) =>
+      adminApi.saveAiConfig({ parameterName: def.name, value: String(n), threshold: current?.threshold ?? 0 }),
     onSuccess: () => {
-      toast.success("Setting saved");
+      toast.success(`${def.title} saved. It applies within about 30 seconds.`);
       qc.invalidateQueries({ queryKey: ["ai-config"] });
-      onDone();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const err = (k: string) => (errors as Record<string, { message?: string }>)[k]?.message;
+  const parsed = Number(value);
+  const valid = value.trim() !== "" && Number.isInteger(parsed) && parsed >= def.min && parsed <= def.max;
+  const changed = valid && parsed !== saved;
+
+  const onSave = () => {
+    if (!valid) return setError(`Enter a whole number from ${def.min} to ${def.max}.`);
+    setError("");
+    save.mutate(parsed);
+  };
 
   return (
-    <form onSubmit={handleSubmit((v) => save.mutate(v as z.infer<typeof schema>))} className="space-y-4" noValidate>
-      <TextField
-        label="Parameter name"
-        placeholder="e.g. FaceDetectionSensitivity"
-        disabled={!!editing}
-        error={err("parameterName")}
-        {...register("parameterName")}
-      />
-      <TextField label="Value" error={err("value")} {...register("value")} />
-      <TextField label="Threshold (0 to 1)" type="number" step="0.05" min={0} max={1} error={err("threshold")} {...register("threshold")} />
-      <div className="flex justify-end pt-2">
-        <SubmitButton loading={save.isPending}>{editing ? "Save changes" : "Add setting"}</SubmitButton>
+    <article className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+        <Icon size={21} />
       </div>
-    </form>
+      <h3 className="font-bold text-[#0A2540]">{def.title}</h3>
+      <p className="mt-1 text-sm text-slate-500">{def.desc}</p>
+
+      <div className="mt-5 flex items-center gap-3">
+        <input
+          type="number"
+          min={def.min}
+          max={def.max}
+          step={1}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError("");
+          }}
+          aria-label={def.title}
+          className="w-28 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+        />
+        <span className="text-sm text-slate-500">{def.unit}</span>
+      </div>
+      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+
+      <p className="mt-3 text-xs text-slate-400">
+        {current?.value != null && current.value !== ""
+          ? `Current: ${saved} ${def.unit} · updated ${fmtDateTime(current.updatedAt ?? current.createdAt)}`
+          : `Using the built-in default (${def.fallback} ${def.unit})`}
+      </p>
+
+      <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+        <span className="text-xs text-slate-400">
+          Allowed: {def.min} to {def.max}
+        </span>
+        <button
+          onClick={onSave}
+          disabled={!changed || save.isPending}
+          className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {save.isPending && <Loader2 size={15} className="animate-spin" />}
+          Save
+        </button>
+      </div>
+    </article>
   );
 }
 
 export default function AiConfigPage() {
-  const [modal, setModal] = useState<{ open: boolean; editing: AiConfig | null }>({ open: false, editing: null });
-  const { data, isLoading, error } = useQuery({ queryKey: ["ai-config"], queryFn: adminApi.aiConfigs });
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ["ai-config"], queryFn: adminApi.aiConfigs });
+  const byName = new Map((data ?? []).map((c) => [c.parameterName, c]));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="AI Settings"
-        subtitle="Tunable parameters for AI grading and proctoring."
-        action={<AddButton onClick={() => setModal({ open: true, editing: null })}>Add setting</AddButton>}
+        subtitle="Tune how strictly the proctoring system reacts. Changes apply within about 30 seconds."
       />
 
-      <div className="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
-        <Info size={18} className="mt-0.5 shrink-0" />
-        <p>
-          These values are stored in the database. The backend does not read them yet, so changing them has no effect until the grading and proctoring code is wired to use them.
-        </p>
-      </div>
-
-      <DataTable
-        rows={data ?? []}
-        loading={isLoading}
-        error={error ? (error as Error).message : undefined}
-        searchText={(r) => `${r.parameterName ?? ""} ${r.value ?? ""}`}
-        placeholder="Search settings..."
-        columns={[
-          { header: "Parameter", cell: (r) => <span className="font-semibold text-[#0A2540]">{r.parameterName}</span> },
-          { header: "Value", cell: (r) => r.value },
-          { header: "Threshold", cell: (r) => r.threshold },
-          { header: "Updated", cell: (r) => <span className="text-slate-500">{fmtDateTime(r.updatedAt ?? r.createdAt)}</span> },
-        ]}
-        actions={(r) => <RowActions onEdit={() => setModal({ open: true, editing: r })} />}
-      />
-
-      <Modal
-        open={modal.open}
-        title={modal.editing ? "Edit setting" : "New setting"}
-        onClose={() => setModal({ open: false, editing: null })}
-      >
-        <ConfigForm editing={modal.editing} onDone={() => setModal({ open: false, editing: null })} />
-      </Modal>
+      {isLoading ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-64 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      ) : isError ? (
+        <ErrorState title="Couldn’t load the settings" message={(error as Error).message} onRetry={() => refetch()} />
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {SETTINGS.map((def) => (
+            // key includes the saved value, so a card resets to the stored number after a refresh
+            <SettingCard key={`${def.name}:${byName.get(def.name)?.value ?? ""}`} def={def} current={byName.get(def.name)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

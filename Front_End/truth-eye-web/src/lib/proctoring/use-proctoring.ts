@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { toast } from "sonner";
 import { examTakeApi } from "@/lib/api/exam-take";
 import { uploadEvidence } from "@/lib/api/evidence";
+import { settingsApi } from "@/lib/api/settings";
 
 const FACE_MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
@@ -13,6 +14,10 @@ const PHONE_MODEL = "/mediapipe/efficientdet_lite0.tflite";
 // Category names the model may use: "cell phone" (COCO model) or "phone" (your own model)
 const PHONE_LABELS = ["cell phone", "phone"];
 const PHONE_SCORE = 0.5; // lower = catches more, but more false alarms
+
+// Defaults used until the server settings arrive (or if they can't be loaded)
+const DEFAULT_NO_FACE_SECONDS = 3;
+const DEFAULT_MULTIPLE_FACES_SECONDS = 2;
 
 export type ProctorEvent =
   | "TabSwitch"
@@ -73,6 +78,10 @@ export function useProctoring({ sessionId, active, faceEnabled, videoRef }: Opti
   const last = useRef<Partial<Record<ProctorEvent, number>>>({});
   const evidenceCount = useRef(0);
 
+  // How many seconds (checks, one per second) a missing / extra face must last before it is reported.
+  // A ref, so the running detector always reads the latest values without being restarted.
+  const limits = useRef({ none: DEFAULT_NO_FACE_SECONDS, multi: DEFAULT_MULTIPLE_FACES_SECONDS });
+
   const report = useCallback(
     (type: ProctorEvent, confidence = 1) => {
       const now = Date.now();
@@ -105,6 +114,32 @@ export function useProctoring({ sessionId, active, faceEnabled, videoRef }: Opti
     },
     [sessionId, videoRef]
   );
+
+  // Load the proctoring settings from the server (and refresh them every minute while the exam is open)
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const s = await settingsApi.proctoring();
+        if (cancelled) return;
+        limits.current = {
+          none: Math.max(2, Math.round(s.noFaceSeconds || DEFAULT_NO_FACE_SECONDS)),
+          multi: Math.max(2, Math.round(s.multipleFacesSeconds || DEFAULT_MULTIPLE_FACES_SECONDS)),
+        };
+      } catch {
+        /* keep the defaults: the exam never depends on this request */
+      }
+    };
+
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [active]);
 
   // Browser behaviour listeners
   useEffect(() => {
@@ -214,14 +249,14 @@ export function useProctoring({ sessionId, active, faceEnabled, videoRef }: Opti
           if (n === 0) {
             multi = 0;
             none++;
-            if (none >= 3) {
+            if (none >= limits.current.none) {
               setFace("none");
               report("NoFace", 0.9);
             }
           } else if (n > 1) {
             none = 0;
             multi++;
-            if (multi >= 2) {
+            if (multi >= limits.current.multi) {
               setFace("multiple");
               report("MultipleFaces", 0.9);
             }

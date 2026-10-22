@@ -202,15 +202,14 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// TEMPORARY checks: remove both lines once CORS works, then publish again
-app.MapGet("/version", () => "cors-fix-v2");
-app.MapGet("/cors-debug", () => string.Join(" | ", corsOrigins));
 
 app.MapHealthChecks("/health");
+
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<NotificationHub>("/hubs/notification");
 app.MapHub<ExamMonitoringHub>("/hubs/exam-monitoring");
 app.MapControllers();
+
 
 try
 {
