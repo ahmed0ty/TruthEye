@@ -20,7 +20,7 @@ export function Logo({ light = false, className }: { light?: boolean; className?
           light ? "text-white" : "text-[#0A2540]"
         )}
       >
-        TruthEye
+        ExamGurd
       </span>
     </div>
   );

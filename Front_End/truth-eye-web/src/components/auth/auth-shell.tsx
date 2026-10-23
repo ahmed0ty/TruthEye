@@ -33,7 +33,7 @@ function Logo({ light = false }: { light?: boolean }) {
         <ShieldCheck size={24} />
       </div>
       <span className={`text-xl font-bold ${light ? "text-white" : "text-[#0A2540]"}`}>
-        TruthEye
+        ExamGurd
       </span>
     </div>
   );

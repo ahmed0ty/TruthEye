@@ -100,7 +100,7 @@ function IntroContent({ step, open }: { step: number; open: boolean }) {
         </svg>
 
         <h1 className="mt-6 text-3xl font-bold tracking-tight text-white">
-          Truth<span className="text-teal-300">Eye</span>
+          Exam<span className="text-teal-300">Gurd</span>
         </h1>
         <p className="mt-1 text-sm text-slate-300">Secure Exam Proctoring Platform</p>
 
