@@ -7,7 +7,7 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "TruthEye",
+  title: "ExamGurd",
   description: "Online exam platform with smart proctoring",
 };
 
