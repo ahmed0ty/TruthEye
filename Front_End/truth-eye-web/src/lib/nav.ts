@@ -1,7 +1,7 @@
 import {
   BarChart3, BookOpen, Building2, ClipboardList, FileText, GraduationCap, History,
-  LayoutDashboard, LifeBuoy, MessageSquare, ScanEye, Settings, ShieldCheck, Stethoscope,
-  Ticket, Users, type LucideIcon,
+  LayoutDashboard, LifeBuoy, MessageSquare, ScanEye, ScrollText, Settings, ShieldCheck,
+  Presentation, Ticket, UserCog, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/types/api";
 
@@ -12,25 +12,32 @@ export interface NavItem {
   soon?: boolean;
 }
 
+const facultyCore: NavItem[] = [
+  { label: "Home", href: "/admin", icon: LayoutDashboard },
+  { label: "Students", href: "/admin/students", icon: Users },
+  { label: "Doctors", href: "/admin/doctors", icon: Presentation },
+  { label: "Proctors", href: "/admin/proctors", icon: ScanEye },
+  { label: "Departments", href: "/admin/departments", icon: Building2 },
+  { label: "Courses", href: "/admin/courses", icon: BookOpen },
+];
+const staffItem: NavItem = { label: "Staff", href: "/admin/staff", icon: UserCog };
+const logItem: NavItem = { label: "Activity Log", href: "/admin/activity", icon: ScrollText };
+const messages: NavItem = { label: "Messages", href: "/chat", icon: MessageSquare };
+
 export const NAV: Record<Role, NavItem[]> = {
   SuperAdmin: [
     { label: "Home", href: "/admin", icon: LayoutDashboard },
     { label: "Universities", href: "/admin/universities", icon: Building2 },
     { label: "Faculties", href: "/admin/faculties", icon: GraduationCap },
     { label: "Departments", href: "/admin/departments", icon: BookOpen },
-    { label: "Faculty Admins", href: "/admin/admins", icon: ShieldCheck },
+    { label: "Deans", href: "/admin/admins", icon: ShieldCheck },
     { label: "Support Team", href: "/admin/supports", icon: LifeBuoy },
+    logItem,
     { label: "AI Settings", href: "/admin/ai-config", icon: Settings },
   ],
-  Admin: [
-    { label: "Home", href: "/admin", icon: LayoutDashboard },
-    { label: "Students", href: "/admin/students", icon: Users },
-    { label: "Doctors", href: "/admin/doctors", icon: Stethoscope },
-    { label: "Proctors", href: "/admin/proctors", icon: ScanEye },
-    { label: "Departments", href: "/admin/departments", icon: Building2 },
-    { label: "Courses", href: "/admin/courses", icon: BookOpen },
-    { label: "Messages", href: "/chat", icon: MessageSquare },
-  ],
+  Admin: [...facultyCore, staffItem, logItem, messages],
+  FacultySecretary: [...facultyCore, staffItem, logItem, messages],
+  TechnicalStaff: [...facultyCore, staffItem, messages],
   Doctor: [
     { label: "Home", href: "/doctor", icon: LayoutDashboard },
     { label: "My Exams", href: "/doctor/exams", icon: ClipboardList },
@@ -53,7 +60,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "Messages", href: "/chat", icon: MessageSquare },
   ],
   Support: [
-    { label: "Home", href: "/support", icon: LayoutDashboard },
+    { label: "Home", href: "/support", icon: LifeBuoy },
     { label: "Tickets", href: "/support/tickets", icon: Ticket },
     { label: "Messages", href: "/chat", icon: MessageSquare },
   ],

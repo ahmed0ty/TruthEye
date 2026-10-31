@@ -128,7 +128,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
-
+using TruthEye.Security;
 namespace TruthEye.API.Hubs
 {
     [Authorize]
@@ -156,7 +156,7 @@ namespace TruthEye.API.Hubs
             _logger.LogInformation("Student joined exam monitoring: {SessionId}", examSessionId);
         }
 
-        [Authorize(Roles = "Proctor,Admin")]
+        [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
         public async Task MonitorExam(string examId)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"exam-monitor:{examId}");

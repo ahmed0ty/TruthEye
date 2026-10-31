@@ -6,6 +6,7 @@ import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Ban, CheckCircle2 } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { SubmitButton, TextField } from "@/components/ui/form-fields";
@@ -14,6 +15,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
 import { adminApi } from "@/lib/api/admin";
 import { useDelete } from "@/hooks/use-crud";
+import { useAuth } from "@/lib/auth/store";
 import type { Proctor } from "@/types/admin";
 
 const base = z.object({
@@ -95,7 +97,18 @@ function ProctorForm({ editing, onDone }: { editing: Proctor | null; onDone: () 
 export default function ProctorsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: Proctor | null }>({ open: false, editing: null });
   const { data, isLoading, error } = useQuery({ queryKey: ["proctors"], queryFn: adminApi.proctorList });
-  const del = useDelete<Proctor>(["proctors"], adminApi.deleteProctor, "Proctor deactivated");
+ const user = useAuth((s) => s.user);
+  const canDelete = user?.role === "Admin" || user?.role === "FacultySecretary";
+  const qc = useQueryClient();
+  const del = useDelete<Proctor>(["proctors"], adminApi.deleteProctor, "Proctor deleted");
+  const toggle = useMutation({
+    mutationFn: (p: Proctor) => (p.isActive ? adminApi.disableProctor(p.id) : adminApi.enableProctor(p.id)),
+    onSuccess: (_r, p) => {
+      toast.success(p.isActive ? "Proctor disabled" : "Proctor enabled");
+      qc.invalidateQueries({ queryKey: ["proctors"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -125,7 +138,20 @@ export default function ProctorsPage() {
           { header: "Status", cell: (r) => <StatusBadge active={r.isActive} /> },
         ]}
         actions={(r) => (
-          <RowActions onEdit={() => setModal({ open: true, editing: r })} onDelete={() => del.setTarget(r)} />
+          <RowActions
+            extra={
+              <button
+                type="button"
+                onClick={() => toggle.mutate(r)}
+                title={r.isActive ? "Disable" : "Enable"}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                {r.isActive ? <Ban size={17} /> : <CheckCircle2 size={17} />}
+              </button>
+            }
+            onEdit={() => setModal({ open: true, editing: r })}
+            onDelete={canDelete ? () => del.setTarget(r) : undefined}
+          />
         )}
       />
 
@@ -139,8 +165,8 @@ export default function ProctorsPage() {
 
       <Confirm
         open={!!del.target}
-        title="Deactivate proctor"
-        text={`Deactivate ${del.target?.firstName} ${del.target?.lastName}?`}
+        title="Delete proctor"
+        text={`Delete ${del.target?.firstName} ${del.target?.lastName}? They will be removed from your lists. You can undo this from the activity log.`}
         loading={del.mutation.isPending}
         onCancel={() => del.setTarget(null)}
         onConfirm={() => del.target && del.mutation.mutate(del.target.id)}

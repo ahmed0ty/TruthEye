@@ -1,6 +1,8 @@
 export type Role =
   | "SuperAdmin"
   | "Admin"
+  | "FacultySecretary"
+  | "TechnicalStaff"
   | "Doctor"
   | "Student"
   | "Proctor"
@@ -41,6 +43,8 @@ export interface SessionUser {
 export const ROLE_HOME: Record<Role, string> = {
   SuperAdmin: "/admin",
   Admin: "/admin",
+  FacultySecretary: "/admin",
+  TechnicalStaff: "/admin",
   Doctor: "/doctor",
   Student: "/student",
   Proctor: "/proctor",
@@ -68,8 +72,10 @@ export interface PersonRow {
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
-  SuperAdmin: "System Admin",
-  Admin: "Faculty Admin",
+  SuperAdmin: "University President",
+  Admin: "Dean",
+  FacultySecretary: "Faculty Secretary",
+  TechnicalStaff: "Technical Team",
   Doctor: "Doctor",
   Student: "Student",
   Proctor: "Proctor",

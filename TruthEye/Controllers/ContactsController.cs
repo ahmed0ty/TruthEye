@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.Entities;
 using TruthEye.Entities.Data;
+using TruthEye.Security;
 using TruthEye.UnitOfWorkk;
-
 namespace TruthEye.Controllers
 {
     [ApiController]
@@ -48,7 +48,7 @@ namespace TruthEye.Controllers
                 foreach (var s in courses.SelectMany(c => c.RegisteredStudents).DistinctBy(s => s.Id))
                     result.Add(Make(s, "Student"));
             }
-            else if (role == "Admin")
+            else if (StaffRules.IsFacultyStaff(role ?? ""))
             {
                 var admin = await _unitOfWork.Repository<Admin>().GetByIdAsync(id);
                 if (admin != null)
@@ -62,7 +62,7 @@ namespace TruthEye.Controllers
             else
             {
                 foreach (var a in await _unitOfWork.Repository<Admin>().FindAsync(x => x.IsActive))
-                    result.Add(Make(a, "Admin"));
+                    result.Add(Make(a, StaffRules.RoleOf(a)));
             }
 
             result.RemoveAll(c => c.Id == id);

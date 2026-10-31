@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using TruthEye.Entities;
 using TruthEye.UnitOfWorkk;
-
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-   [Authorize(Roles = "Admin,Proctor")]
+   [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
 
     public class DirectorController : ControllerBase
     {

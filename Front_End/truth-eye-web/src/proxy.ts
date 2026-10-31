@@ -5,8 +5,8 @@ import { ROLE_HOME, type Role } from "@/types/api";
 const GUARDS: Record<string, Role[]> = {
   "/student": ["Student"],
   "/doctor": ["Doctor"],
-  "/admin": ["Admin", "SuperAdmin"],
-  "/proctor": ["Proctor", "Admin"],
+  "/admin": ["Admin", "FacultySecretary", "TechnicalStaff", "SuperAdmin"],
+  "/proctor": ["Proctor", "Admin", "FacultySecretary", "TechnicalStaff"],
   "/support": ["Support", "SuperAdmin"],
   "/exam": ["Student"],
 };

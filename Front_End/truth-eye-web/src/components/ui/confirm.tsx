@@ -8,6 +8,8 @@ export function Confirm({
   title,
   text,
   loading,
+  confirmText = "Delete",
+  variant = "danger",
   onCancel,
   onConfirm,
 }: {
@@ -15,13 +17,21 @@ export function Confirm({
   title: string;
   text: string;
   loading?: boolean;
+  confirmText?: string;
+  variant?: "danger" | "success";
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
     <Modal open={open} title={title} onClose={onCancel}>
       <div className="flex gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+       <div
+  className={
+    variant === "danger"
+      ? "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600"
+      : "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700"
+  }
+>
           <TriangleAlert size={24} />
         </div>
         <p className="pt-1 text-sm text-slate-600">{text}</p>
@@ -33,10 +43,14 @@ export function Confirm({
         <button
           onClick={onConfirm}
           disabled={loading}
-          className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+         className={
+  variant === "danger"
+    ? "flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+    : "flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-teal-800 disabled:opacity-60"
+}
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
-          Delete
+         {confirmText}
         </button>
       </div>
     </Modal>

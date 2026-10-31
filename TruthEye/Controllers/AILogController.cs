@@ -4,7 +4,7 @@ using System.Security.Claims;
 using TruthEye.Entities;
 using TruthEye.Services;
 using TruthEye.UnitOfWorkk;
-
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -15,7 +15,7 @@ namespace TruthEye.Controllers
         private static readonly HashSet<string> KnownEvents = new()
         {
             "TabSwitch", "WindowBlur", "FullscreenExit", "CopyPaste",
-            "ContextMenu", "NoFace", "MultipleFaces", "ConnectionLost","PhoneDetected"
+            "ContextMenu", "NoFace", "MultipleFaces", "ConnectionLost","PhoneDetected", "PaperDetected"
         };
         private const int MaxEvidencePerSession = 40;
 
@@ -44,7 +44,8 @@ namespace TruthEye.Controllers
         // Proctors and admins see every session; a doctor only sees sessions of their own exams
         private async Task<bool> CanViewSession(int sessionId)
         {
-            if (User.IsInRole("Proctor") || User.IsInRole("Admin")) return true;
+       if (User.IsInRole("Proctor") || User.IsInRole("Admin")
+    || User.IsInRole("FacultySecretary") || User.IsInRole("TechnicalStaff")) return true;
 
             var s = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId, x => x.Exam!);
             return s?.Exam != null && s.Exam.DoctorId == CurrentUserId();
@@ -133,7 +134,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Proctor,Doctor,Admin")]
+        [Authorize(Roles = "Proctor,Doctor," + AppRoles.FacultyStaff)]
         [HttpGet("evidence/{name}")]
         public async Task<IActionResult> GetEvidence(string name)
         {
@@ -150,7 +151,7 @@ namespace TruthEye.Controllers
             return File(stream, "image/jpeg");
         }
 
-        [Authorize(Roles = "Proctor,Doctor,Admin")]
+        [Authorize(Roles = "Proctor,Doctor," + AppRoles.FacultyStaff)]
         [HttpGet("session/{sessionId}")]
         public async Task<IActionResult> GetSessionLogs(int sessionId)
         {
@@ -166,7 +167,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Proctor,Admin")]
+        [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
         [HttpGet("flagged")]
         public async Task<IActionResult> GetFlaggedLogs([FromQuery] double threshold = 0.7)
         {

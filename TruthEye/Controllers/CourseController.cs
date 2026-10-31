@@ -5,13 +5,15 @@ using System.Security.Claims;
 using TruthEye.DTOs;
 using TruthEye.Services;
 using TruthEye.Swagger;
-
+using BulkEnrollRequest = TruthEye.Services.BulkEnrollRequest;
+using BulkEnrollResult = TruthEye.Services.BulkEnrollResult;
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = AppRoles.FacultyStaff)]
     public class CoursesController : ControllerBase
     {
         private readonly ICourseService _courseService;
@@ -79,6 +81,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = AppRoles.Managers)]
         [SwaggerOperation(Summary = "Delete course", OperationId = "DeleteCourse")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -255,6 +258,35 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to assign student {StudentId} to course {CourseId}", studentId, courseId);
+                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
+            }
+        }
+
+        // Adds many students at once (emails or national IDs). The fixed word "bulk" wins over {studentId} in the route.
+        [HttpPost("{courseId}/students/bulk")]
+        [SwaggerOperation(Summary = "Assign many students to a course (by email or national ID)", OperationId = "AssignStudentsBulk")]
+        [ProducesResponseType(typeof(ApiResponse<BulkEnrollResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AssignStudentsBulk(int courseId, [FromBody] BulkEnrollRequest request)
+        {
+            try
+            {
+                if (request?.Identifiers == null || request.Identifiers.Count == 0)
+                    return BadRequest(new ApiErrorResponse { Success = false, Error = "Select at least one student." });
+
+                var adminId = GetCurrentUserId();
+                var result = await _courseService.AssignStudentsBulkAsync(courseId, request.Identifiers, adminId);
+
+                return Ok(new ApiResponse<BulkEnrollResult>
+                {
+                    Success = true,
+                    Message = $"{result.Added} students added to the course",
+                    Data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Bulk enroll into course {CourseId} failed", courseId);
                 return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
             }
         }

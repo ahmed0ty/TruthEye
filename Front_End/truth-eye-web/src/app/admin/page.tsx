@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen, Building2, GraduationCap, LifeBuoy, ScanEye, ShieldCheck, Sparkles,
-  Stethoscope, Users, type LucideIcon,
+  Presentation, Users, type LucideIcon,
 } from "lucide-react";
 import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { adminApi } from "@/lib/api/admin";
@@ -33,8 +33,9 @@ interface StatDef {
 
 const ADMIN_STATS: StatDef[] = [
   { key: "students", label: "Students", icon: Users, tone: "navy", fn: adminApi.students },
-  { key: "doctors", label: "Doctors", icon: Stethoscope, tone: "teal", fn: adminApi.doctors },
+{ key: "doctors", label: "Doctors", icon: Presentation, tone: "teal", fn: adminApi.doctors },
   { key: "proctors", label: "Proctors", icon: ScanEye, tone: "sky", fn: adminApi.proctors },
+
   { key: "departments", label: "Departments", icon: Building2, tone: "emerald", fn: adminApi.departments },
   { key: "courses", label: "Courses", icon: BookOpen, tone: "amber", fn: adminApi.courses },
 ];

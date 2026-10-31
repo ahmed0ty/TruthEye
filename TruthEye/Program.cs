@@ -92,7 +92,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services.AddMemoryCache();
-
+builder.Services.AddHttpContextAccessor();
 // Register Services
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -110,6 +110,8 @@ builder.Services.AddHostedService<SessionExpiryWorker>();
 builder.Services.AddSingleton<IEvidenceStore, LocalEvidenceStore>();
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddHostedService<EvidenceRetentionWorker>();
+builder.Services.AddScoped<ICourseEnrollmentService, CourseEnrollmentService>();
+
 
 // CORS: ONE AddCors call. The origins below are always allowed, plus anything listed in Cors:Origins.
 var configuredOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? Array.Empty<string>();

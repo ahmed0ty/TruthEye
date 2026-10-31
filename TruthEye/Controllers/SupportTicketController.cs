@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using TruthEye.DTOs;
 using TruthEye.Services;
-
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -71,7 +71,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Support,Admin")]
+        [Authorize(Roles = "Support," + AppRoles.FacultyStaff)]
         [HttpGet]
         public async Task<IActionResult> GetAllTickets([FromQuery] string status = null)
         {
@@ -87,7 +87,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Support,Admin")]
+        [Authorize(Roles = "Support," + AppRoles.FacultyStaff)]
         [HttpPut("{ticketId}/assign/{supportId}")]
         public async Task<IActionResult> AssignTicket(int ticketId, int supportId)
         {

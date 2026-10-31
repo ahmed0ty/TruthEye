@@ -17,9 +17,11 @@ namespace TruthEye.Services
         Task<bool> AssignStudentToCourseAsync(int courseId, int studentId, int adminId);
         Task<bool> RemoveStudentFromCourseAsync(int courseId, int studentId, int adminId);
         Task<List<StudentDto>> GetCourseStudentsAsync(int courseId, int adminId);
+        Task<string> RevertCourseActionAsync(int logId, int actorId);
 
         Task<List<CourseDto>> GetDoctorCoursesAsync(int doctorId, int adminId);
 
         Task<List<CourseDto>> GetStudentCoursesAsync(int studentId, int adminId);
+        Task<BulkEnrollResult> AssignStudentsBulkAsync(int courseId, List<string> identifiers, int adminId);
     }
 }

@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
 using TruthEye.Entities;
+using TruthEye.Security;
 using TruthEye.Services;
-
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -131,7 +131,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Doctor,Admin")]
+        [Authorize(Roles = "Doctor," + AppRoles.FacultyStaff)]
         [HttpGet("{id}/questions")]
         public async Task<IActionResult> GetExamQuestions(int id)
         {
