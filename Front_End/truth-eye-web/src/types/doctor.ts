@@ -50,6 +50,8 @@ export interface StudentResultRow {
   correctAnswers: number;
   totalQuestions: number;
   submittedAt: string;
+  violationCount: number;
+riskScore: number;
   status?: string;
 }
 

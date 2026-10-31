@@ -12,5 +12,7 @@
         public DateTime SubmittedAt { get; set; }
         public int SessionId { get; set; }
         public string Status { get; set; } = string.Empty;
+        public int ViolationCount { get; set; }
+public int RiskScore { get; set; }
     }
 }

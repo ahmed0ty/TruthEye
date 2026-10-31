@@ -269,7 +269,7 @@ using System.Security.Claims;
 using TruthEye.DTOs;
 using TruthEye.Entities;
 using TruthEye.Services;
-
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -500,7 +500,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Proctor,Admin")]
+        [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
         [HttpGet("active")]
         public async Task<IActionResult> GetActiveSessions()
         {

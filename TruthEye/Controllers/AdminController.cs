@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using TruthEye.Entities;
+using TruthEye.Entities.Data;
 using TruthEye.UnitOfWorkk;
 
 namespace TruthEye.Controllers
@@ -70,13 +73,30 @@ namespace TruthEye.Controllers
         }
 
         [HttpGet("users")]
-        public async Task<IActionResult> GetAllUsers([FromQuery] string role = null)
+        public async Task<IActionResult> GetAllUsers([FromQuery] string? role = null)
         {
             try
             {
-                var users = string.IsNullOrEmpty(role)
-                    ? await _unitOfWork.Repository<User>().GetAllAsync()
-                    : await _unitOfWork.Repository<User>().FindAsync(u => u.Role.Name == role);
+                var query = _unitOfWork.Repository<User>().GetQueryable(u => u.Role);
+                if (!string.IsNullOrEmpty(role))
+                    query = query.Where(u => u.Role.Name == role);
+
+                var users = await query
+                    .OrderBy(u => u.Id)
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.FirstName,
+                        u.LastName,
+                        u.Email,
+                        u.NationalId,
+                        u.PhoneNumber,
+                        Role = u.Role.Name,
+                        u.IsActive,
+                        u.LastLogin,
+                        u.CreatedAt
+                    })
+                    .ToListAsync();
 
                 return Ok(users);
             }
@@ -87,49 +107,33 @@ namespace TruthEye.Controllers
             }
         }
 
+        // الدور بيتحدد من نوع الحساب نفسه، فتغيير RoleId لوحده بيعمل تضارب.
         [HttpPut("users/{userId}/role")]
-        public async Task<IActionResult> UpdateUserRole(int userId, [FromQuery] string roleName)
-        {
-            try
-            {
-                var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
-                if (user == null)
-                    return NotFound(new { Error = "User not found" });
-
-                var role = (await _unitOfWork.Repository<Role>()
-                    .FindAsync(r => r.Name == roleName)).FirstOrDefault();
-
-                if (role == null)
-                    return BadRequest(new { Error = "Invalid role" });
-
-                user.RoleId = role.Id;
-                await _unitOfWork.Repository<User>().UpdateAsync(user);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.LogInformation("User role updated: {UserId} to {RoleName}", userId, roleName);
-                return Ok(new { Message = "Role updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to update user role");
-                return BadRequest(new { Error = ex.Message });
-            }
-        }
+        public IActionResult UpdateUserRole(int userId, [FromQuery] string roleName) =>
+            BadRequest(new { Error = "The role is determined by the account type and can't be changed. Create the account again with the right type." });
 
         [HttpPut("users/{userId}/status")]
         public async Task<IActionResult> UpdateUserStatus(int userId, [FromQuery] bool isActive)
         {
             try
             {
+                var currentId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+                if (userId == currentId)
+                    return BadRequest(new { Error = "You can't change your own status" });
+
                 var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
                 if (user == null)
                     return NotFound(new { Error = "User not found" });
 
+                if (user is SuperAdmin)
+                    return BadRequest(new { Error = "The super admin account can't be disabled" });
+
                 user.IsActive = isActive;
+                user.UpdatedAt = DateTime.UtcNow;
                 await _unitOfWork.Repository<User>().UpdateAsync(user);
                 await _unitOfWork.SaveChangesAsync();
 
-                _logger.LogInformation("User status updated: {UserId} to {Status}", userId, isActive);
+                _logger.LogInformation("User status updated: {UserId} to {Status} by {ActorId}", userId, isActive, currentId);
                 return Ok(new { Message = "Status updated successfully" });
             }
             catch (Exception ex)

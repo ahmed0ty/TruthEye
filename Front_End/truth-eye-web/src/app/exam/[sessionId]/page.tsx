@@ -2,15 +2,18 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { unlockAlarm } from "@/lib/proctoring/alarm";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, Camera, CheckCircle2, Clock, FileQuestion, Loader2,
-  Maximize, MonitorOff, ScanEye, ShieldAlert, WifiOff,
+  ScanEye, ShieldAlert, WifiOff,
 } from "lucide-react";
 import { ErrorState } from "@/components/ui/states";
+import { ExamLeftScreen } from "@/components/exam/exam-lock-ui";
 import { examTakeApi } from "@/lib/api/exam-take";
+import { useExamLock } from "@/lib/exam-lock";
 import { useProctoring } from "@/lib/proctoring/use-proctoring";
 import { cn } from "@/lib/utils";
 import type { SavedAnswer } from "@/types/exam-take";
@@ -66,6 +69,15 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const data = take.data;
   const questions = data?.questions ?? [];
 
+  // The exam was already closed (submitted, timed out, or the student left it): go to the result
+  useEffect(() => {
+    if (!take.isError) return;
+    const msg = (take.error as Error)?.message ?? "";
+    if (/not in progress|left the exam page|time has expired/i.test(msg)) {
+      router.replace(`/student/results/${sessionId}`);
+    }
+  }, [take.isError, take.error, router, sessionId]);
+
   // Resume: jump to the first unanswered question
   useEffect(() => {
     if (!data || initialised.current) return;
@@ -89,10 +101,26 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   };
 
+  // Defined BEFORE submit so a normal submit can release the lock
+  const lock = useExamLock({
+    sessionId,
+    // The answer on the screen when the student leaves is counted too
+    getCurrentAnswer: () => {
+      const cur = questions[index];
+      if (!cur || locked[cur.id]) return null;
+      const hasOptions = (cur.options?.length ?? 0) > 0;
+      if (hasOptions ? draft.optionId == null : !draft.text.trim()) return null;
+      return { questionId: cur.id, selectedOptionId: draft.optionId, answerText: draft.text };
+    },
+    // leaving while the exam is being submitted is not a violation
+    isSuspended: () => submit.isPending || submit.isSuccess,
+  });
+
   // Defined BEFORE useProctoring so proctoring can be switched off while submitting
   const submit = useMutation({
     mutationFn: () => examTakeApi.submit(sessionId),
     onSuccess: () => {
+      lock.release(); // a normal submit is not "leaving the exam"
       toast.success("Exam submitted");
       router.replace(`/student/results/${sessionId}`);
       // Proctoring is already inactive (isPending/isSuccess), so leaving fullscreen is no longer recorded
@@ -101,12 +129,26 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const { violations, fullscreenLost, face, offline } = useProctoring({
+  const { violations, face, offline } = useProctoring({
     sessionId,
-    active: phase === "running" && !submit.isPending && !submit.isSuccess,
-    faceEnabled: !!stream && !submit.isPending && !submit.isSuccess,
+    active: phase === "running" && !lock.terminated && !submit.isPending && !submit.isSuccess,
+    faceEnabled: !!stream && !lock.terminated && !submit.isPending && !submit.isSuccess,
     videoRef,
   });
+
+  // The exam ended because the student left it: switch the camera off right away
+  useEffect(() => {
+    if (!lock.terminated) return;
+    stream?.getTracks().forEach((t) => t.stop());
+    setStream(null);
+  }, [lock.terminated, stream]);
+
+  // Safety net: the camera is always released when the page goes away (back button, link, closed tab)
+  useEffect(() => {
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [stream]);
 
   // ---- Draft autosave (survives refresh; cleared once the answer is saved) ----
   const currentId = questions[index]?.id;
@@ -182,7 +224,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     submit.mutate();
   }, [left, phase, submit]);
 
-  // Warn before leaving mid-exam (not while/after submitting)
+  // Warn before leaving mid-exam (not while/after submitting). If the student confirms, the lock ends the exam.
   useEffect(() => {
     if (phase !== "running" || submit.isPending || submit.isSuccess) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -191,12 +233,14 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   }, [phase, submit.isPending, submit.isSuccess]);
 
   const begin = async () => {
+    unlockAlarm();
     setGateError("");
     setStarting(true);
     let s: MediaStream | null = null;
     try {
       s = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
-      await document.documentElement.requestFullscreen();
+      const r = await lock.start(); // enters fullscreen and starts the lock
+      if (!r.ok) throw new Error(r.error ?? "Couldn't start the secure exam mode.");
       setStream(s);
       setPhase("running");
     } catch (e) {
@@ -204,15 +248,31 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
       const name = (e as DOMException)?.name;
       setGateError(
         name === "NotAllowedError"
-          ? "Camera or fullscreen permission was denied. Allow both and try again."
+          ? "Camera permission was denied. Allow it and try again."
           : name === "NotFoundError"
           ? "No camera was found on this device."
+          : e instanceof Error && e.message
+          ? e.message
           : "Couldn't start the secure exam mode. Try again."
       );
     } finally {
       setStarting(false);
     }
   };
+
+  /* ---------- The student left the exam ---------- */
+  if (lock.terminated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F6F8FA] p-4">
+        <ExamLeftScreen
+          reason={lock.terminated.reason}
+          result={lock.terminated.result}
+          failed={lock.terminated.failed}
+          onRetry={lock.retry}
+        />
+      </main>
+    );
+  }
 
   /* ---------- Loading / error ---------- */
   if (take.isLoading) {
@@ -239,8 +299,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   if (phase === "gate") {
     const rules = [
       "Your camera must stay on for the whole exam.",
-      "The exam runs in fullscreen. Leaving it is recorded.",
-      "Switching tabs or windows is recorded.",
+      "The exam runs in fullscreen. Exiting fullscreen ends the exam immediately.",
+      "Switching tabs or windows, splitting the screen or reloading ends the exam immediately.",
+      "You can’t come back after leaving. Your saved answers (and the one on the screen) are graded.",
       "Copy, paste and right-click are disabled.",
       "Only one face should be visible in the camera.",
       "Each answer is final once you move to the next question.",
@@ -467,25 +528,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
         <video ref={videoRef} autoPlay muted playsInline className="aspect-[4/3] w-full -scale-x-100 object-cover" />
         {faceBadge && <div className={cn("px-2 py-1 text-center text-[11px] font-semibold", faceBadge.cls)}>{faceBadge.text}</div>}
       </div>
-
-      {/* fullscreen lock */}
-      {fullscreenLost && !submit.isPending && !submit.isSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A2540]/95 p-6 backdrop-blur">
-          <div className="animate-pop max-w-md text-center text-white">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/20 text-red-300">
-              <MonitorOff size={32} />
-            </div>
-            <h2 className="text-2xl font-bold">You left fullscreen</h2>
-            <p className="mt-2 text-slate-300">This was recorded. The timer is still running. Return to fullscreen to continue.</p>
-            <button
-              onClick={() => document.documentElement.requestFullscreen().catch(() => {})}
-              className="mx-auto mt-6 flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 font-semibold text-white transition hover:bg-teal-400"
-            >
-              <Maximize size={18} /> Return to fullscreen
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

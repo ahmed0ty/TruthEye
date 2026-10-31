@@ -13,7 +13,7 @@ export interface Exam {
   courseName?: string | null;
 }
 
-export type SessionStatus = "InProgress" | "Completed" | "TimedOut";
+export type SessionStatus = "InProgress" | "Completed" | "TimedOut" | "Terminated";
 
 export interface ExamSession {
   id: number;

@@ -39,9 +39,10 @@ function ExamCard({ exam, session, index }: { exam: Exam; session?: ExamSession;
 
   let action: React.ReactNode;
   if (session?.status === "InProgress") {
+    // The exam was opened but not finished. If the student left it after starting, it is already closed on the server.
     action = (
       <Link href={`/exam/${session.id}`} className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-bold text-white transition hover:bg-amber-600">
-        <RotateCcw size={16} /> Continue exam
+        <RotateCcw size={16} /> Open exam
       </Link>
     );
   } else if (session) {
@@ -78,9 +79,17 @@ function ExamCard({ exam, session, index }: { exam: Exam; session?: ExamSession;
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-600 text-white shadow-lg shadow-teal-600/25">
           <ClipboardList size={20} />
         </div>
-        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold capitalize", STATE_STYLE[state])}>
-          {state}
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold capitalize", STATE_STYLE[state])}>
+            {state}
+          </span>
+          {session?.status === "Terminated" && (
+            <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600">Left the exam</span>
+          )}
+          {session?.status === "TimedOut" && (
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-600">Timed out</span>
+          )}
+        </div>
       </div>
 
       <h3 className="text-lg font-extrabold leading-snug text-slate-900">{exam.title}</h3>
@@ -120,6 +129,11 @@ export default function StudentExamsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Available Exams" subtitle="Each exam allows a single attempt. Make sure you’re ready before you start." />
+
+      <div className="animate-fade-in rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <b>Before you start:</b> the exam runs in full screen. Switching tabs, opening another window, exiting full screen,
+        splitting the screen or reloading the page ends the exam immediately, and you can’t come back to it.
+      </div>
 
       <div className="animate-fade-in flex flex-wrap gap-2">
         {FILTERS.map((f) => (

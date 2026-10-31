@@ -114,3 +114,42 @@ export interface AiConfig {
   createdAt: string;
   updatedAt?: string | null;
 }
+export interface StaffMember {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  nationalId: string;
+  phoneNumber: string;
+  role: "FacultySecretary" | "TechnicalStaff";
+  isActive: boolean;
+  facultyId: number;
+  facultyName: string;
+  lastLogin?: string | null;
+  createdAt: string;
+  canManage: boolean;
+}
+
+export interface ActivityLogItem {
+  id: number;
+  timestamp: string;
+  actorId?: number | null;
+  actorName: string;
+  actorRole?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: number | null;
+  description: string;
+  oldValues?: string | null;
+  newValues?: string | null;
+  isReverted: boolean;
+  revertedAt?: string | null;
+  canRevert: boolean;
+}
+
+export interface ActivityLogPage {
+  items: ActivityLogItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
