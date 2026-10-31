@@ -389,24 +389,13 @@ using AutoMapper;
 using TruthEye.DTOs;
 using TruthEye.Entities;
 using TruthEye.Entities.Data;
+using TruthEye.Security;
 
 namespace TruthEye.Mapping
 {
     public class MappingProfile : Profile
     {
-        private static string GetDefaultRole(User user)
-        {
-            return user switch
-            {
-                Student => "Student",
-                Doctor => "Doctor",
-                SuperAdmin => "SuperAdmin",
-                Admin => "Admin",
-                Proctor => "Proctor",
-                Support => "Support",
-                _ => "User"
-            };
-        }
+        private static string GetDefaultRole(User user) => StaffRules.RoleOf(user);
 
         public MappingProfile()
         {
@@ -429,8 +418,8 @@ namespace TruthEye.Mapping
             // Admin -> AdminDto
             CreateMap<Admin, AdminDto>()
                 .IncludeBase<User, UserDto>()
-                .ForMember(dest => dest.Role, opt => opt.MapFrom(src => "Admin"))
-                .ForMember(dest => dest.UserType, opt => opt.MapFrom(src => "Admin"))
+                .ForMember(dest => dest.Role, opt => opt.MapFrom(src => StaffRules.RoleOf(src)))
+                .ForMember(dest => dest.UserType, opt => opt.MapFrom(src => StaffRules.RoleOf(src)))
                 .ForMember(dest => dest.UniversityName, opt => opt.MapFrom(src =>
                     src.University != null ? src.University.Name : string.Empty))
                 .ForMember(dest => dest.FacultyName, opt => opt.MapFrom(src =>
@@ -456,13 +445,7 @@ namespace TruthEye.Mapping
                 .ForMember(dest => dest.SystemLogs, opt => opt.Ignore());
 
             CreateMap<User, UserDto>()
-                .ForMember(dest => dest.UserType, opt => opt.MapFrom(src =>
-                    src is Student ? "Student" :
-                    src is Doctor ? "Doctor" :
-                    src is SuperAdmin ? "SuperAdmin" :
-                    src is Admin ? "Admin" :
-                    src is Proctor ? "Proctor" :
-                    src is Support ? "Support" : "User"))
+                .ForMember(dest => dest.UserType, opt => opt.MapFrom(src => StaffRules.RoleOf(src)))
                 .ForMember(dest => dest.Role, opt => opt.MapFrom(src =>
                     src.Role != null ? src.Role.Name : GetDefaultRole(src)));
 
@@ -532,6 +515,8 @@ namespace TruthEye.Mapping
                 .ForMember(dest => dest.IsActive, opt => opt.MapFrom(_ => true))
                 .ForMember(dest => dest.ProfileImage, opt => opt.MapFrom(_ => "default.jpg"))
                 .ForMember(dest => dest.RoleId, opt => opt.Ignore())
+                .ForMember(dest => dest.FacultyId, opt => opt.Ignore())
+                .ForMember(dest => dest.Faculty, opt => opt.Ignore())
                 .ForMember(dest => dest.IsOnDuty, opt => opt.MapFrom(_ => false))
                 .ForMember(dest => dest.ActiveSessionsCount, opt => opt.MapFrom(_ => 0))
                 .ForMember(dest => dest.AverageResponseTime, opt => opt.MapFrom(_ => 0.0));

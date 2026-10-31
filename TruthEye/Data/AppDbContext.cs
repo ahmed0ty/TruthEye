@@ -17,6 +17,8 @@ namespace TruthEye.Data
         public DbSet<Doctor> Doctors { get; set; }
         public DbSet<Admin> Admins { get; set; }
         public DbSet<SuperAdmin> SuperAdmins { get; set; }
+        public DbSet<FacultySecretary> FacultySecretaries { get; set; }
+public DbSet<TechnicalStaff> TechnicalStaffMembers { get; set; }
         public DbSet<Proctor> Proctors { get; set; }
         public DbSet<Support> Supports { get; set; }
         public DbSet<University> Universities { get; set; }
@@ -48,14 +50,16 @@ namespace TruthEye.Data
             base.OnModelCreating(modelBuilder);
 
             #region User Configuration
-            modelBuilder.Entity<User>()
-                .HasDiscriminator<string>("UserType")
-                .HasValue<Student>("Student")
-                .HasValue<Doctor>("Doctor")
-                .HasValue<Admin>("Admin")
-                .HasValue<SuperAdmin>("SuperAdmin")
-                .HasValue<Proctor>("Proctor")
-                .HasValue<Support>("Support");
+modelBuilder.Entity<User>()
+    .HasDiscriminator<string>("UserType")
+    .HasValue<Student>("Student")
+    .HasValue<Doctor>("Doctor")
+    .HasValue<Admin>("Admin")
+    .HasValue<FacultySecretary>("FacultySecretary")
+    .HasValue<TechnicalStaff>("TechnicalStaff")
+    .HasValue<SuperAdmin>("SuperAdmin")
+    .HasValue<Proctor>("Proctor")
+    .HasValue<Support>("Support");
 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
@@ -163,6 +167,12 @@ namespace TruthEye.Data
             #endregion
 
             #region Proctor Relationships
+            modelBuilder.Entity<Proctor>()
+    .HasOne(p => p.Faculty)
+    .WithMany()
+    .HasForeignKey(p => p.FacultyId)
+    .OnDelete(DeleteBehavior.NoAction);
+
             modelBuilder.Entity<Proctor>()
                 .HasMany(p => p.AssignedExams)
                 .WithMany(e => e.Proctors)
@@ -301,6 +311,9 @@ namespace TruthEye.Data
             #endregion
 
             #region Indexes
+            modelBuilder.Entity<SystemLog>()
+    .HasIndex(l => new { l.FacultyId, l.Timestamp });
+
             modelBuilder.Entity<ExamSession>()
                 .HasIndex(es => new { es.StudentId, es.ExamId });
 
@@ -316,15 +329,17 @@ namespace TruthEye.Data
             #endregion
 
             #region Seed Data
-            modelBuilder.Entity<Role>().HasData(
-                new Role { Id = 1, Name = "Student" },
-                new Role { Id = 2, Name = "Doctor" },
-                new Role { Id = 3, Name = "Admin" },
-                new Role { Id = 4, Name = "Proctor" },
-                new Role { Id = 5, Name = "Support" },
-                new Role { Id = 6, Name = "SuperAdmin" }
-            );
-            #endregion
+modelBuilder.Entity<Role>().HasData(
+    new Role { Id = 1, Name = "Student" },
+    new Role { Id = 2, Name = "Doctor" },
+    new Role { Id = 3, Name = "Admin" },
+    new Role { Id = 4, Name = "Proctor" },
+    new Role { Id = 5, Name = "Support" },
+    new Role { Id = 6, Name = "SuperAdmin" },
+    new Role { Id = 7, Name = "FacultySecretary" },
+    new Role { Id = 8, Name = "TechnicalStaff" }
+);
+#endregion
         }
     }
 }

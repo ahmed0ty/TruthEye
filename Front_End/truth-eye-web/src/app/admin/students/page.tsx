@@ -7,7 +7,7 @@ import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Ban, CheckCircle2, Upload } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -18,6 +18,7 @@ import { AddButton, RowActions } from "@/components/ui/row-actions";
 import { adminApi } from "@/lib/api/admin";
 import { YEARS, labelOf } from "@/lib/enums";
 import { useDelete } from "@/hooks/use-crud";
+import { useAuth } from "@/lib/auth/store";
 import type { Student } from "@/types/admin";
 
 const base = z.object({
@@ -115,7 +116,18 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
 export default function StudentsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: Student | null }>({ open: false, editing: null });
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["students"], queryFn: adminApi.studentList });
-  const del = useDelete<Student>(["students"], adminApi.deleteStudent, "Student deactivated");
+  const del = useDelete<Student>(["students"], adminApi.deleteStudent, "Student deleted");
+ const user = useAuth((s) => s.user);
+  const canDelete = user?.role === "Admin" || user?.role === "FacultySecretary";
+  const qc = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: (s: Student) => (s.isActive ? adminApi.disableStudent(s.id) : adminApi.enableStudent(s.id)),
+    onSuccess: (_d, s) => {
+      toast.success(s.isActive ? "Student disabled" : "Student enabled");
+      qc.invalidateQueries({ queryKey: ["students"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const [f, setF] = useState({ dept: "all", year: "all", status: "all" });
 
   const all = data ?? [];
@@ -167,7 +179,20 @@ export default function StudentsPage() {
           { header: "Status", sortValue: (r) => Number(r.isActive), cell: (r) => <StatusBadge active={r.isActive} /> },
         ]}
         actions={(r) => (
-          <RowActions onEdit={() => setModal({ open: true, editing: r })} onDelete={() => del.setTarget(r)} />
+          <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => toggle.mutate(r)}
+              title={r.isActive ? "Disable" : "Enable"}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+            >
+              {r.isActive ? <Ban size={16} /> : <CheckCircle2 size={16} />}
+            </button>
+            <RowActions
+              onEdit={() => setModal({ open: true, editing: r })}
+              onDelete={canDelete ? () => del.setTarget(r) : undefined}
+            />
+          </div>
         )}
       />
 
@@ -181,8 +206,8 @@ export default function StudentsPage() {
 
       <Confirm
         open={!!del.target}
-        title="Deactivate student"
-        text={`Deactivate ${del.target?.firstName} ${del.target?.lastName}? They won't be able to log in.`}
+        title="Delete student"
+        text={`Delete ${del.target?.firstName} ${del.target?.lastName}? They will be removed and won't be able to log in.`}
         loading={del.mutation.isPending}
         onCancel={() => del.setTarget(null)}
         onConfirm={() => del.target && del.mutation.mutate(del.target.id)}

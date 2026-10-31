@@ -1033,6 +1033,20 @@ namespace TruthEye.Services
             _logger.LogInformation("Question deleted: {QuestionId}", questionId);
         }
  
+        // Event weights: keep them identical to src/lib/proctoring/events.ts
+        private static readonly Dictionary<string, int> EventWeights = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["MultipleFaces"] = 3,
+            ["NoFace"] = 3,
+            ["PhoneDetected"] = 3,
+            ["TabSwitch"] = 2,
+            ["FullscreenExit"] = 2,
+            ["ConnectionLost"] = 2,
+            ["WindowBlur"] = 1,
+            ["CopyPaste"] = 1,
+            ["ContextMenu"] = 1,
+        };
+ 
         public async Task<List<StudentExamResultDto>> GetExamResultsAsync(int examId, int doctorId)
         {
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
@@ -1040,13 +1054,27 @@ namespace TruthEye.Services
                 throw new Exception("Access denied or exam not found");
  
             // Completed and TimedOut attempts both count; only unfinished ones are hidden
-            var sessions = await _unitOfWork.Repository<ExamSession>()
+            var sessions = (await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(es => es.ExamId == examId && es.Status != "InProgress",
-                    es => es.Student!);
+                    es => es.Student!)).ToList();
  
             var questions = await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == examId);
             var totalQuestions = questions.Count();
+ 
+            // One query for every session's proctoring events, then a score per session
+            var sessionIds = sessions.Select(s => s.Id).ToList();
+            var logs = sessionIds.Count == 0
+                ? new List<AILog>()
+                : (await _unitOfWork.Repository<AILog>()
+                    .FindAsync(l => sessionIds.Contains(l.ExamSessionId))).ToList();
+ 
+            var stats = logs
+                .GroupBy(l => l.ExamSessionId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (Count: g.Count(),
+                          Score: g.Sum(l => EventWeights.TryGetValue(l.EventType ?? "", out var w) ? w : 1)));
  
             return sessions.Select(s =>
             {
@@ -1056,6 +1084,8 @@ namespace TruthEye.Services
                     var marksPerQuestion = (double)s.TotalMarks / totalQuestions;
                     correctAnswers = (int)Math.Round(s.TotalScore / marksPerQuestion);
                 }
+ 
+                stats.TryGetValue(s.Id, out var st);
  
                 return new StudentExamResultDto
                 {
@@ -1070,6 +1100,8 @@ namespace TruthEye.Services
                     CorrectAnswers = correctAnswers,
                     TotalQuestions = totalQuestions,
                     Status = s.Status,
+                    ViolationCount = st.Count,
+                    RiskScore = st.Score,
                     SubmittedAt = s.SubmittedAt ?? s.EndTime ?? s.StartTime
                 };
             }).ToList();
@@ -1145,4 +1177,3 @@ namespace TruthEye.Services
         }
     }
 }
- 

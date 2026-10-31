@@ -10,6 +10,7 @@ export const EVENT_META: Record<string, { label: string; weight: number; severit
   CopyPaste: { label: "Copy / paste", weight: 1, severity: "low" },
   ContextMenu: { label: "Right-click", weight: 1, severity: "low" },
   ConnectionLost: { label: "Connection lost", weight: 2, severity: "medium" },
+  PaperDetected: { label: "Paper detected", weight: 3, severity: "high" },
 };
 
 export const metaOf = (type: string) =>
@@ -21,11 +22,15 @@ export const SEVERITY_STYLE: Record<Severity, string> = {
   low: "bg-slate-100 text-slate-600",
 };
 
+// An attempt is "flagged" for review once its events add up to this score
+export const FLAG_SCORE = 3;
+export const isFlagged = (score: number) => score >= FLAG_SCORE;
+
 export type Risk = "high" | "medium" | "low";
 
 export function riskOf(logs: { eventType: string }[]): { level: Risk; score: number } {
   const score = logs.reduce((a, l) => a + metaOf(l.eventType).weight, 0);
-  return { score, level: score >= 8 ? "high" : score >= 3 ? "medium" : "low" };
+  return { score, level: score >= 8 ? "high" : score >= FLAG_SCORE ? "medium" : "low" };
 }
 
 export const RISK_STYLE: Record<Risk, { badge: string; ring: string; label: string }> = {

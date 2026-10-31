@@ -6,6 +6,7 @@ import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Ban, CheckCircle2 } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { SelectField, SubmitButton, TextField } from "@/components/ui/form-fields";
@@ -15,6 +16,7 @@ import { AddButton, RowActions } from "@/components/ui/row-actions";
 import { adminApi } from "@/lib/api/admin";
 import { DEGREES, labelOf } from "@/lib/enums";
 import { useDelete } from "@/hooks/use-crud";
+import { useAuth } from "@/lib/auth/store";
 import type { Doctor } from "@/types/admin";
 
 const base = z.object({
@@ -118,7 +120,18 @@ function DoctorForm({ editing, onDone }: { editing: Doctor | null; onDone: () =>
 export default function DoctorsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: Doctor | null }>({ open: false, editing: null });
   const { data, isLoading, error } = useQuery({ queryKey: ["doctors"], queryFn: adminApi.doctorList });
-  const del = useDelete<Doctor>(["doctors"], adminApi.deleteDoctor, "Doctor deactivated");
+const user = useAuth((s) => s.user);
+  const canDelete = user?.role === "Admin" || user?.role === "FacultySecretary";
+  const qc = useQueryClient();
+  const del = useDelete<Doctor>(["doctors"], adminApi.deleteDoctor, "Doctor deleted");
+  const toggle = useMutation({
+    mutationFn: (d: Doctor) => (d.isActive ? adminApi.disableDoctor(d.id) : adminApi.enableDoctor(d.id)),
+    onSuccess: (_r, d) => {
+      toast.success(d.isActive ? "Doctor disabled" : "Doctor enabled");
+      qc.invalidateQueries({ queryKey: ["doctors"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -142,7 +155,20 @@ export default function DoctorsPage() {
           { header: "Status", cell: (r) => <StatusBadge active={r.isActive} /> },
         ]}
         actions={(r) => (
-          <RowActions onEdit={() => setModal({ open: true, editing: r })} onDelete={() => del.setTarget(r)} />
+          <RowActions
+            extra={
+              <button
+                type="button"
+                onClick={() => toggle.mutate(r)}
+                title={r.isActive ? "Disable" : "Enable"}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                {r.isActive ? <Ban size={17} /> : <CheckCircle2 size={17} />}
+              </button>
+            }
+            onEdit={() => setModal({ open: true, editing: r })}
+            onDelete={canDelete ? () => del.setTarget(r) : undefined}
+          />
         )}
       />
 
@@ -156,8 +182,8 @@ export default function DoctorsPage() {
 
       <Confirm
         open={!!del.target}
-        title="Deactivate doctor"
-        text={`Deactivate Dr. ${del.target?.firstName} ${del.target?.lastName}? They won't be able to log in.`}
+        title="Delete doctor"
+        text={`Delete Dr. ${del.target?.firstName} ${del.target?.lastName}? They will be removed from your lists. You can undo this from the activity log.`}
         loading={del.mutation.isPending}
         onCancel={() => del.setTarget(null)}
         onConfirm={() => del.target && del.mutation.mutate(del.target.id)}

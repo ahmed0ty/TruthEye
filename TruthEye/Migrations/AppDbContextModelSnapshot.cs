@@ -796,6 +796,16 @@ namespace TruthEye.Migrations
                         {
                             Id = 6,
                             Name = "SuperAdmin"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "FacultySecretary"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Name = "TechnicalStaff"
                         });
                 });
 
@@ -869,6 +879,9 @@ namespace TruthEye.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ActorRole")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("AdminId")
                         .HasColumnType("int");
 
@@ -883,9 +896,27 @@ namespace TruthEye.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("FacultyId")
+                        .HasColumnType("int");
+
                     b.Property<string>("IpAddress")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsReverted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RevertedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RevertedBy")
+                        .HasColumnType("int");
 
                     b.Property<int?>("SuperAdminId")
                         .HasColumnType("int");
@@ -896,6 +927,8 @@ namespace TruthEye.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SuperAdminId");
+
+                    b.HasIndex("FacultyId", "Timestamp");
 
                     b.ToTable("SystemLogs");
                 });
@@ -1000,8 +1033,8 @@ namespace TruthEye.Migrations
 
                     b.Property<string>("UserType")
                         .IsRequired()
-                        .HasMaxLength(13)
-                        .HasColumnType("nvarchar(13)");
+                        .HasMaxLength(21)
+                        .HasColumnType("nvarchar(21)");
 
                     b.HasKey("Id");
 
@@ -1132,16 +1165,24 @@ namespace TruthEye.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("FacultyId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsOnDuty")
                         .HasColumnType("bit");
 
                     b.Property<DateTime?>("LastDutyDate")
                         .HasColumnType("datetime2");
 
+                    b.HasIndex("FacultyId");
+
                     b.ToTable("Users", t =>
                         {
                             t.Property("Department")
                                 .HasColumnName("Proctor_Department");
+
+                            t.Property("FacultyId")
+                                .HasColumnName("Proctor_FacultyId");
                         });
 
                     b.HasDiscriminator().HasValue("Proctor");
@@ -1217,6 +1258,38 @@ namespace TruthEye.Migrations
                         .HasColumnType("int");
 
                     b.HasDiscriminator().HasValue("Support");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.Data.FacultySecretary", b =>
+                {
+                    b.HasBaseType("TruthEye.Entities.Data.Admin");
+
+                    b.ToTable("Users", t =>
+                        {
+                            t.Property("FacultyId")
+                                .HasColumnName("Admin_FacultyId");
+
+                            t.Property("UniversityId")
+                                .HasColumnName("Admin_UniversityId");
+                        });
+
+                    b.HasDiscriminator().HasValue("FacultySecretary");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.Data.TechnicalStaff", b =>
+                {
+                    b.HasBaseType("TruthEye.Entities.Data.Admin");
+
+                    b.ToTable("Users", t =>
+                        {
+                            t.Property("FacultyId")
+                                .HasColumnName("Admin_FacultyId");
+
+                            t.Property("UniversityId")
+                                .HasColumnName("Admin_UniversityId");
+                        });
+
+                    b.HasDiscriminator().HasValue("TechnicalStaff");
                 });
 
             modelBuilder.Entity("CourseDoctor", b =>
@@ -1588,6 +1661,16 @@ namespace TruthEye.Migrations
                     b.Navigation("Faculty");
 
                     b.Navigation("University");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.Proctor", b =>
+                {
+                    b.HasOne("TruthEye.Entities.Faculty", "Faculty")
+                        .WithMany()
+                        .HasForeignKey("FacultyId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Faculty");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.Student", b =>

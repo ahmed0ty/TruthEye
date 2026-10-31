@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.Services;
-
+using TruthEye.Security;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -30,7 +30,7 @@ namespace TruthEye.Controllers
             return mine.Any(x => x.Id == reportId);
         }
 
-        [Authorize(Roles = "Student,Doctor,Admin")]
+        [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
         [HttpPost("generate")]
         public async Task<IActionResult> GenerateReport([FromQuery] int studentId, [FromQuery] int examId)
         {
@@ -66,7 +66,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Student,Doctor,Admin")]
+        [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
         [HttpGet("{reportId}/pdf")]
         public async Task<IActionResult> ExportToPdf(int reportId)
         {
@@ -85,7 +85,7 @@ namespace TruthEye.Controllers
             }
         }
 
-        [Authorize(Roles = "Student,Doctor,Admin")]
+        [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
         [HttpGet("{reportId}/excel")]
         public async Task<IActionResult> ExportToExcel(int reportId)
         {

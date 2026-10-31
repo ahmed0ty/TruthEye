@@ -504,12 +504,11 @@
 //     }
 // }
 
-
 using AutoMapper;
 using TruthEye.DTOs;
 using TruthEye.Entities;
 using TruthEye.UnitOfWorkk;
- 
+
 namespace TruthEye.Services
 {
     public class ExamSessionService : IExamSessionService
@@ -519,7 +518,7 @@ namespace TruthEye.Services
         private readonly IAIEvaluationService _aiEvaluationService;
         private readonly ILogger<ExamSessionService> _logger;
         private readonly INotificationService _notifications;
- 
+
         public ExamSessionService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
@@ -533,32 +532,32 @@ namespace TruthEye.Services
             _logger = logger;
             _notifications = notifications;
         }
- 
+
         public async Task<ExamSessionDto> GetExamSessionByIdAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Student!, s => s.Exam!);
- 
+
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             return _mapper.Map<ExamSessionDto>(session);
         }
- 
+
         public async Task<ExamSessionDto> StartExamSessionAsync(StartExamSessionDto startDto)
         {
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(startDto.ExamId);
             if (exam == null)
                 throw new Exception("Exam not found");
- 
+
             var existingSessions = await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(es => es.StudentId == startDto.StudentId && es.ExamId == startDto.ExamId);
- 
+
             if (existingSessions.Any())
             {
                 throw new Exception("You have already attempted this exam. Only one attempt is allowed.");
             }
- 
+
             var session = new ExamSession
             {
                 StudentId = startDto.StudentId,
@@ -568,57 +567,57 @@ namespace TruthEye.Services
                 AttemptNumber = 1,
                 TotalMarks = exam.TotalMarks
             };
- 
+
             await _unitOfWork.Repository<ExamSession>().AddAsync(session);
             await _unitOfWork.SaveChangesAsync();
- 
+
             return _mapper.Map<ExamSessionDto>(session);
         }
- 
+
         public async Task<ExamSessionDto> ContinueExamSessionAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!, s => s.Answers!);
- 
+
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             if (session.Status != "InProgress")
                 throw new Exception("Session is not in progress");
- 
+
             var exam = session.Exam;
             if (DateTime.UtcNow > exam.EndTime)
             {
                 await AutoSubmitSession(session);
                 throw new Exception("Exam time has expired");
             }
- 
+
             var sessionDto = _mapper.Map<ExamSessionDto>(session);
             sessionDto.CurrentAnswers = await GetCurrentAnswersAsync(sessionId);
- 
+
             return sessionDto;
         }
- 
+
         public async Task<QuestionNavigationDto> MoveToNextQuestionAsync(int sessionId, int currentQuestionId, StudentAnswerDto answerDto)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!);
- 
+
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             if (session.Status != "InProgress")
                 throw new Exception("Session is not in progress");
- 
+
             if (ComputeRemainingSeconds(session, session.Exam!) <= 0)
                 throw new Exception("Exam time has expired");
- 
+
             await SaveAnswerAsync(sessionId, answerDto);
- 
+
             var nextQuestion = await GetNextQuestionAsync(session.ExamId, currentQuestionId);
             var currentQuestionNumber = await GetCurrentQuestionNumberAsync(session.ExamId, currentQuestionId);
             var totalQuestions = await GetTotalQuestionsAsync(session.ExamId);
- 
+
             return new QuestionNavigationDto
             {
                 NextQuestion = nextQuestion,
@@ -627,31 +626,31 @@ namespace TruthEye.Services
                 TotalQuestions = totalQuestions
             };
         }
- 
+
         public async Task<ExamResultDto> SubmitExamSessionAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!);
- 
+
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             if (session.Status != "InProgress")
                 throw new Exception("Session is not in progress");
- 
+
             var exam = session.Exam!;
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == exam.Id,
                     q => (q as MCQQuestion)!.Options!))
                 .ToList();
- 
+
             await _unitOfWork.BeginTransactionAsync();
- 
+
             ExamResultDto result;
             try
             {
                 var (totalScore, correctAnswers) = await GradeAnswersAsync(session, questions);
- 
+
                 session.EndTime = DateTime.UtcNow;
                 session.SubmittedAt = DateTime.UtcNow;
                 session.Status = "Completed";
@@ -659,13 +658,13 @@ namespace TruthEye.Services
                 session.TotalMarks = exam.TotalMarks;
                 session.Percentage = session.TotalMarks > 0 ? (totalScore / session.TotalMarks * 100) : 0;
                 session.IsPassed = session.Percentage >= exam.PassingScore;
- 
+
                 await _unitOfWork.Repository<ExamSession>().UpdateAsync(session);
                 await _unitOfWork.CommitTransactionAsync();
- 
+
                 var aiLogs = await _unitOfWork.Repository<AILog>()
                     .FindAsync(log => log.ExamSessionId == session.Id);
- 
+
                 result = new ExamResultDto
                 {
                     SessionId = session.Id,
@@ -686,7 +685,7 @@ namespace TruthEye.Services
                 await _unitOfWork.RollbackTransactionAsync();
                 throw;
             }
- 
+
             // Notifications go out only after the grade is saved, and a failure here never fails the submit
             try
             {
@@ -697,24 +696,24 @@ namespace TruthEye.Services
             {
                 _logger.LogWarning(ex, "Couldn't send submit notifications for session {SessionId}", session.Id);
             }
- 
+
             return result;
         }
- 
+
         public async Task<ExamResultDto> GetExamResultAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId, s => s.Exam);
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             if (session.Status == "InProgress")
                 throw new Exception("Exam is still in progress");
- 
+
             var answers = (await _unitOfWork.Repository<Answer>()
                 .FindAsync(a => a.ExamSessionId == sessionId)).ToList();
             var aiLogs = await _unitOfWork.Repository<AILog>()
                 .FindAsync(log => log.ExamSessionId == sessionId);
- 
+
             return new ExamResultDto
             {
                 SessionId = session.Id,
@@ -730,15 +729,15 @@ namespace TruthEye.Services
                 SubmittedAt = session.EndTime ?? DateTime.UtcNow
             };
         }
- 
+
         private async Task SaveAnswerAsync(int sessionId, StudentAnswerDto answerDto)
         {
             var existingAnswer = await _unitOfWork.Repository<Answer>()
                 .FindAsync(a => a.ExamSessionId == sessionId && a.QuestionId == answerDto.QuestionId);
- 
+
             if (existingAnswer.Any())
                 throw new Exception("Cannot modify answer after submission");
- 
+
             var answer = new Answer
             {
                 ExamSessionId = sessionId,
@@ -749,44 +748,44 @@ namespace TruthEye.Services
                 IsCorrect = false,
                 MarksObtained = 0
             };
- 
+
             await _unitOfWork.Repository<Answer>().AddAsync(answer);
             await _unitOfWork.SaveChangesAsync();
         }
- 
+
         private async Task<QuestionDto?> GetNextQuestionAsync(int examId, int currentQuestionId)
         {
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == examId))
                 .OrderBy(q => q.Id)
                 .ToList();
- 
+
             var currentIndex = questions.FindIndex(q => q.Id == currentQuestionId);
             return currentIndex + 1 < questions.Count ? _mapper.Map<QuestionDto>(questions[currentIndex + 1]) : null;
         }
- 
+
         private async Task<int> GetCurrentQuestionNumberAsync(int examId, int currentQuestionId)
         {
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == examId))
                 .OrderBy(q => q.Id)
                 .ToList();
- 
+
             return questions.FindIndex(q => q.Id == currentQuestionId) + 1;
         }
- 
+
         private async Task<int> GetTotalQuestionsAsync(int examId)
         {
             var questions = await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == examId);
             return questions.Count();
         }
- 
+
         public async Task<List<StudentAnswerDto>> GetCurrentAnswersAsync(int sessionId)
         {
             var answers = await _unitOfWork.Repository<Answer>()
                 .FindAsync(a => a.ExamSessionId == sessionId);
- 
+
             return answers.Select(a => new StudentAnswerDto
             {
                 QuestionId = a.QuestionId,
@@ -794,18 +793,20 @@ namespace TruthEye.Services
                 SelectedOptionId = a.SelectedOptionId
             }).ToList();
         }
- 
+
         public async Task<ExamAnswersDto> GetExamAnswersAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId, s => s.Exam!);
             if (session == null)
                 throw new Exception("Session not found");
- 
+
             var exam = session.Exam;
- 
-            // Any finished session (Completed or TimedOut) can be reviewed
-            bool canViewAnswers = DateTime.UtcNow > exam.EndTime || session.Status != "InProgress";
- 
+
+            // Finished sessions can be reviewed, but a terminated one can't see the right answers
+            // while classmates are still taking the exam
+            bool canViewAnswers = DateTime.UtcNow > exam.EndTime
+                || (session.Status != "InProgress" && session.Status != "Terminated");
+
             if (!canViewAnswers)
             {
                 return new ExamAnswersDto
@@ -821,22 +822,22 @@ namespace TruthEye.Services
                     IsPassed = false
                 };
             }
- 
+
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == exam.Id,
                     q => (q as MCQQuestion)!.Options!))
                 .ToList();
- 
+
             var studentAnswers = (await _unitOfWork.Repository<Answer>()
                 .FindAsync(a => a.ExamSessionId == sessionId))
                 .ToList();
- 
+
             var questionsWithAnswers = new List<QuestionWithAnswerDto>();
- 
+
             foreach (var question in questions)
             {
                 var studentAnswer = studentAnswers.FirstOrDefault(a => a.QuestionId == question.Id);
- 
+
                 var questionDto = new QuestionWithAnswerDto
                 {
                     QuestionId = question.Id,
@@ -849,7 +850,7 @@ namespace TruthEye.Services
                     AISimilarityScore = studentAnswer?.AISimilarityScore,
                     AIFeedback = studentAnswer?.AIFeedback
                 };
- 
+
                 if (question is MCQQuestion mcqQuestion)
                 {
                     questionDto.Options = mcqQuestion.Options?.Select(o => new MCQOptionDto
@@ -858,7 +859,7 @@ namespace TruthEye.Services
                         OptionText = o.OptionText,
                         IsCorrect = o.IsCorrect
                     }).ToList() ?? new List<MCQOptionDto>();
- 
+
                     questionDto.CorrectOptionId = mcqQuestion.Options?.FirstOrDefault(o => o.IsCorrect)?.Id;
                     questionDto.StudentSelectedOptionId = studentAnswer?.SelectedOptionId;
                 }
@@ -866,10 +867,10 @@ namespace TruthEye.Services
                 {
                     questionDto.ModelAnswer = writtenQuestion.ModelAnswer;
                 }
- 
+
                 questionsWithAnswers.Add(questionDto);
             }
- 
+
             return new ExamAnswersDto
             {
                 ExamId = exam.Id,
@@ -883,7 +884,7 @@ namespace TruthEye.Services
                 IsPassed = session.IsPassed
             };
         }
- 
+
         private string GetViewAnswersMessage(ExamSession session, Exam exam)
         {
             if (DateTime.UtcNow <= exam.EndTime && session.Status == "InProgress")
@@ -895,36 +896,40 @@ namespace TruthEye.Services
             {
                 return "Please submit the exam first to view the results.";
             }
+            else if (session.Status == "Terminated")
+            {
+                return "Answers will be available after the exam time has ended.";
+            }
             else
             {
                 return "Answers are not currently available";
             }
         }
- 
+
         // ------------------------------------------------------------------
         // Grading and time-out handling
         // ------------------------------------------------------------------
- 
+
         private static DateTime DeadlineOf(ExamSession s, Exam e)
         {
             var byDuration = s.StartTime.AddMinutes(e.Duration);
             return byDuration < e.EndTime ? byDuration : e.EndTime;
         }
- 
+
         // One grading routine shared by manual submit, auto submit and the background sweep
         private async Task<(double TotalScore, int Correct)> GradeAnswersAsync(ExamSession session, List<Question> questions)
         {
             double totalScore = 0;
             int correct = 0;
- 
+
             var answers = await _unitOfWork.Repository<Answer>()
                 .FindAsync(a => a.ExamSessionId == session.Id);
- 
+
             foreach (var answer in answers)
             {
                 var question = questions.FirstOrDefault(q => q.Id == answer.QuestionId);
                 if (question == null) continue;
- 
+
                 if (question is MCQQuestion mcq)
                 {
                     var right = mcq.Options?.FirstOrDefault(o => o.IsCorrect);
@@ -948,39 +953,39 @@ namespace TruthEye.Services
                     {
                         var ai = await _aiEvaluationService.EvaluateWrittenAnswerAsync(
                             question.QuestionText, written.ModelAnswer, answer.AnswerText, written.AIThreshold);
- 
+
                         answer.IsCorrect = ai.IsCorrect;
                         answer.MarksObtained = ai.MarksObtained * question.Marks;
                         answer.AISimilarityScore = ai.SimilarityScore;
                         answer.AIFeedback = ai.Feedback;
- 
+
                         totalScore += answer.MarksObtained;
                         if (ai.IsCorrect) correct++;
                     }
                 }
- 
+
                 await _unitOfWork.Repository<Answer>().UpdateAsync(answer);
             }
- 
+
             return (totalScore, correct);
         }
- 
+
         private async Task AutoSubmitSession(ExamSession session)
         {
             if (session.Status != "InProgress") return;
- 
+
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(session.ExamId);
             if (exam == null) return;
- 
+
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == exam.Id, q => (q as MCQQuestion)!.Options!))
                 .ToList();
- 
+
             var (totalScore, _) = await GradeAnswersAsync(session, questions);
- 
+
             var deadline = DeadlineOf(session, exam);
             var end = deadline < DateTime.UtcNow ? deadline : DateTime.UtcNow;
- 
+
             session.EndTime = end;
             session.SubmittedAt = end;
             session.Status = "TimedOut";
@@ -988,82 +993,93 @@ namespace TruthEye.Services
             session.TotalMarks = exam.TotalMarks;
             session.Percentage = session.TotalMarks > 0 ? totalScore / session.TotalMarks * 100 : 0;
             session.IsPassed = session.Percentage >= exam.PassingScore;
- 
+
             await _unitOfWork.Repository<ExamSession>().UpdateAsync(session);
             await _unitOfWork.SaveChangesAsync();
         }
- 
+
         // Called every minute by SessionExpiryWorker
         public async Task<int> ExpireOverdueSessionsAsync()
         {
             var open = await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(s => s.Status == "InProgress", s => s.Exam!);
- 
+
             var now = DateTime.UtcNow;
             var grace = TimeSpan.FromMinutes(2); // the browser's own auto-submit gets the first chance
             var count = 0;
- 
-            foreach (var s in open.Where(x => x.Exam != null && DeadlineOf(x, x.Exam!) + grace < now).ToList())
+
+            foreach (var s in open.Where(x => x.Exam != null).ToList())
             {
                 try
                 {
-                    await AutoSubmitSession(s);
-                    count++;
+                    if (DeadlineOf(s, s.Exam!) + grace < now)
+                    {
+                        // the time is over
+                        await AutoSubmitSession(s);
+                        count++;
+                    }
+                    else if (ExamPresence.LastSeen(s.Id) is DateTime seen && now - seen > ExamPresence.AbandonAfter)
+                    {
+                        // the exam page went silent (tab closed, browser killed...) and never reported it
+                        await TerminateSessionInternalAsync(s, "lost-contact", null);
+                        count++;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Couldn't auto-submit session {SessionId}", s.Id);
+                    _logger.LogWarning(ex, "Couldn't close session {SessionId}", s.Id);
                 }
             }
- 
             return count;
         }
- 
+
         public async Task<IEnumerable<ExamSessionDto>> GetStudentExamHistoryAsync(int studentId)
         {
             var sessions = await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(es => es.StudentId == studentId,
                     es => es.Exam);
- 
+
             return _mapper.Map<IEnumerable<ExamSessionDto>>(sessions);
         }
- 
+
         public async Task<IEnumerable<ExamSessionDto>> GetActiveSessionsAsync()
         {
             var sessions = await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(es => es.Status == "InProgress",
                     es => es.Exam, es => es.Student);
- 
+
             return _mapper.Map<IEnumerable<ExamSessionDto>>(sessions);
         }
- 
+
         public async Task<ExamTakeDto> GetExamTakeAsync(int sessionId, int studentId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!);
- 
+
             if (session == null || session.StudentId != studentId)
                 throw new Exception("Session not found");
- 
+
             if (session.Status != "InProgress")
                 throw new Exception("Session is not in progress");
- 
+
+            await GuardReturnAsync(session);   // <-- new
+
             var exam = session.Exam!;
             var remaining = ComputeRemainingSeconds(session, exam);
- 
+
             if (remaining <= 0)
             {
                 await AutoSubmitSession(session);
                 throw new Exception("Exam time has expired");
             }
- 
+
             var questions = (await _unitOfWork.Repository<Question>()
                 .FindAsync(q => q.ExamId == exam.Id, q => (q as MCQQuestion)!.Options!))
                 .OrderBy(q => q.Id)
                 .ToList();
- 
+
             var answers = await GetCurrentAnswersAsync(sessionId);
- 
+
             return new ExamTakeDto
             {
                 SessionId = session.Id,
@@ -1087,13 +1103,152 @@ namespace TruthEye.Services
                 Answers = answers
             };
         }
- 
+
         private static int ComputeRemainingSeconds(ExamSession session, Exam exam)
         {
             var byDuration = session.StartTime.AddMinutes(exam.Duration);
             var deadline = byDuration < exam.EndTime ? byDuration : exam.EndTime;
             return (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalSeconds);
         }
+
+        // ------------------------------------------------------------------
+        // Leaving the exam page
+        // ------------------------------------------------------------------
+
+        // The student left the exam page (switched tab, left full screen, split the screen...).
+        // What was answered so far is graded, the exam is closed, and the student can't open it again.
+        public async Task<ExamResultDto> TerminateExamSessionAsync(
+            int sessionId, int studentId, string reason, LeaveAnswer? currentAnswer)
+        {
+            var session = await _unitOfWork.Repository<ExamSession>()
+                .GetByIdAsync(sessionId, s => s.Exam!);
+
+            if (session == null || session.StudentId != studentId)
+                throw new Exception("Session not found");
+
+            return await TerminateSessionInternalAsync(session, reason, currentAnswer);
+        }
+
+        // Called every few seconds by the open exam page. Returns the current status of the session.
+        public async Task<string> HeartbeatAsync(int sessionId, int studentId)
+        {
+            var session = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId);
+
+            if (session == null || session.StudentId != studentId)
+                throw new Exception("Session not found");
+
+            if (session.Status == "InProgress")
+                ExamPresence.Touch(sessionId);
+
+            return session.Status;
+        }
+
+        // Opening the exam again after the page went silent = the student left, so the exam is over
+        private async Task GuardReturnAsync(ExamSession session)
+        {
+            var lastSeen = ExamPresence.LastSeen(session.Id);
+            if (lastSeen.HasValue && DateTime.UtcNow - lastSeen.Value > ExamPresence.ReturnGrace)
+            {
+                await TerminateSessionInternalAsync(session, "returned", null);
+                throw new Exception("You left the exam page, so the exam was submitted. You can't continue it.");
+            }
+            
+        }
+
+        private async Task<ExamResultDto> TerminateSessionInternalAsync(
+            ExamSession session, string reason, LeaveAnswer? currentAnswer)
+        {
+            // already closed (submitted, timed out or terminated): just return the result
+            if (session.Status != "InProgress")
+                return await GetExamResultAsync(session.Id);
+
+            var exam = session.Exam ?? await _unitOfWork.Repository<Exam>().GetByIdAsync(session.ExamId);
+            if (exam == null)
+                throw new Exception("Exam not found");
+
+            var questions = (await _unitOfWork.Repository<Question>()
+                .FindAsync(q => q.ExamId == exam.Id, q => (q as MCQQuestion)!.Options!))
+                .ToList();
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                // keep the answer that was on the screen when the student left (if it wasn't saved yet)
+                if (currentAnswer != null && questions.Any(q => q.Id == currentAnswer.QuestionId))
+                {
+                    var already = await _unitOfWork.Repository<Answer>()
+                        .FindAsync(a => a.ExamSessionId == session.Id && a.QuestionId == currentAnswer.QuestionId);
+
+                    if (!already.Any())
+                    {
+                        await _unitOfWork.Repository<Answer>().AddAsync(new Answer
+                        {
+                            ExamSessionId = session.Id,
+                            QuestionId = currentAnswer.QuestionId,
+                            AnswerText = currentAnswer.AnswerText ?? string.Empty,
+                            SelectedOptionId = currentAnswer.SelectedOptionId,
+                            AnsweredAt = DateTime.UtcNow,
+                            IsCorrect = false,
+                            MarksObtained = 0
+                        });
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                }
+
+                var (totalScore, _) = await GradeAnswersAsync(session, questions);
+
+                var deadline = DeadlineOf(session, exam);
+                var end = DateTime.UtcNow < deadline ? DateTime.UtcNow : deadline;
+
+                session.EndTime = end;
+                session.SubmittedAt = end;
+                session.Status = "Terminated";
+                session.TotalScore = totalScore;
+                session.TotalMarks = exam.TotalMarks;
+                session.Percentage = session.TotalMarks > 0 ? totalScore / session.TotalMarks * 100 : 0;
+                session.IsPassed = session.Percentage >= exam.PassingScore;
+
+                await _unitOfWork.Repository<ExamSession>().UpdateAsync(session);
+                await _unitOfWork.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+
+            ExamPresence.Forget(session.Id);
+            var why = ReasonText(reason);
+            _logger.LogWarning("Exam session {SessionId} was terminated: {Reason}", session.Id, why);
+
+            // tell the doctor (a notification problem must never undo the termination)
+            try
+            {
+                await _notifications.SendNotificationAsync(
+                    exam.DoctorId,
+                    $"A student {why} during \"{exam.Title}\", so the exam was submitted automatically.",
+                    "Violation");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Couldn't send the violation notification for session {SessionId}", session.Id);
+            }
+
+            return await GetExamResultAsync(session.Id);
+        }
+
+        // Only known codes are accepted, so the text sent by the browser is never used as is
+        private static string ReasonText(string? code) => code switch
+        {
+            "tab-hidden" => "switched to another tab or minimized the browser",
+            "window-blur" => "left the exam window",
+            "fullscreen-exit" => "exited full screen",
+            "split-screen" => "split the screen or resized the window",
+            "page-leave" => "left or reloaded the exam page",
+            "returned" => "came back to the exam after leaving it",
+            "lost-contact" => "lost contact with the exam page",
+            "session-ended" => "had the session ended",
+            _ => "left the exam"
+        };
     }
 }
- 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Camera, Loader2, ShieldAlert, Users } from "lucide-react";
+import { Camera, FileText, Loader2, ShieldAlert, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ErrorState } from "@/components/ui/states";
 import { adminApi } from "@/lib/api/admin";
@@ -19,19 +19,20 @@ interface SettingDef {
   fallback: number;
   min: number;
   max: number;
+  step: number;
+  integer: boolean;
+  /** "value": stored in the Value column. "threshold": stored in the Threshold column (0 to 1). */
+  kind: "value" | "threshold";
   icon: LucideIcon;
 }
 
-// Same names, defaults and limits as the backend (SettingKeys / SettingsService)
 const SETTINGS: SettingDef[] = [
   {
     name: "NoFaceSeconds",
     title: "No face detected",
     desc: "How many seconds a student can be out of the camera before a violation is recorded.",
     unit: "seconds",
-    fallback: 3,
-    min: 2,
-    max: 30,
+    fallback: 3, min: 2, max: 30, step: 1, integer: true, kind: "value",
     icon: Camera,
   },
   {
@@ -39,9 +40,7 @@ const SETTINGS: SettingDef[] = [
     title: "More than one face",
     desc: "How many seconds an extra face can stay in the camera before a violation is recorded.",
     unit: "seconds",
-    fallback: 2,
-    min: 2,
-    max: 30,
+    fallback: 2, min: 2, max: 30, step: 1, integer: true, kind: "value",
     icon: Users,
   },
   {
@@ -49,36 +48,70 @@ const SETTINGS: SettingDef[] = [
     title: "Violations before flagging",
     desc: "After this many recorded violations in one session, proctors get a notification. Set 0 to disable.",
     unit: "violations",
-    fallback: 8,
-    min: 0,
-    max: 1000,
+    fallback: 8, min: 0, max: 1000, step: 1, integer: true, kind: "value",
     icon: ShieldAlert,
+  },
+  {
+    name: "DefaultWrittenThreshold",
+    title: "Default written-answer threshold",
+    desc: "Similarity needed for a written answer to count as correct, used when a doctor adds a written question without choosing a threshold. It applies to new questions only.",
+    unit: "(0.3 to 0.95)",
+    fallback: 0.7, min: 0.3, max: 0.95, step: 0.05, integer: false, kind: "threshold",
+    icon: FileText,
   },
 ];
 
+function storedNumber(def: SettingDef, current?: AiConfig): number | null {
+  if (!current) return null;
+  if (def.kind === "threshold") {
+    return current.threshold != null && current.threshold > 0 ? current.threshold : null;
+  }
+  return current.value != null && current.value !== "" && !Number.isNaN(Number(current.value)) ? Number(current.value) : null;
+}
+
 function SettingCard({ def, current }: { def: SettingDef; current?: AiConfig }) {
   const qc = useQueryClient();
-  const saved = current?.value != null && current.value !== "" ? Number(current.value) : def.fallback;
+  const stored = storedNumber(def, current);
+  const saved = stored ?? def.fallback;
   const [value, setValue] = useState(String(saved));
   const [error, setError] = useState("");
   const Icon = def.icon;
 
   const save = useMutation({
     mutationFn: (n: number) =>
-      adminApi.saveAiConfig({ parameterName: def.name, value: String(n), threshold: current?.threshold ?? 0 }),
+      adminApi.saveAiConfig(
+        def.kind === "threshold"
+          ? { parameterName: def.name, value: String(n), threshold: n }
+          : { parameterName: def.name, value: String(n), threshold: current?.threshold ?? 0 }
+      ),
     onSuccess: () => {
-      toast.success(`${def.title} saved. It applies within about 30 seconds.`);
+      toast.success(
+        def.kind === "threshold"
+          ? `${def.title} saved. It applies to questions added from now on.`
+          : `${def.title} saved. It applies within about 30 seconds.`
+      );
       qc.invalidateQueries({ queryKey: ["ai-config"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const parsed = Number(value);
-  const valid = value.trim() !== "" && Number.isInteger(parsed) && parsed >= def.min && parsed <= def.max;
-  const changed = valid && parsed !== saved;
+  const valid =
+    value.trim() !== "" &&
+    !Number.isNaN(parsed) &&
+    (!def.integer || Number.isInteger(parsed)) &&
+    parsed >= def.min &&
+    parsed <= def.max;
+  const changed = valid && Math.abs(parsed - saved) > 1e-9;
 
   const onSave = () => {
-    if (!valid) return setError(`Enter a whole number from ${def.min} to ${def.max}.`);
+    if (!valid) {
+      return setError(
+        def.integer
+          ? `Enter a whole number from ${def.min} to ${def.max}.`
+          : `Enter a number from ${def.min} to ${def.max}.`
+      );
+    }
     setError("");
     save.mutate(parsed);
   };
@@ -96,7 +129,7 @@ function SettingCard({ def, current }: { def: SettingDef; current?: AiConfig }) 
           type="number"
           min={def.min}
           max={def.max}
-          step={1}
+          step={def.step}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);
@@ -110,9 +143,9 @@ function SettingCard({ def, current }: { def: SettingDef; current?: AiConfig }) 
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
 
       <p className="mt-3 text-xs text-slate-400">
-        {current?.value != null && current.value !== ""
-          ? `Current: ${saved} ${def.unit} · updated ${fmtDateTime(current.updatedAt ?? current.createdAt)}`
-          : `Using the built-in default (${def.fallback} ${def.unit})`}
+        {stored != null
+          ? `Current: ${saved} · updated ${fmtDateTime(current?.updatedAt ?? current?.createdAt)}`
+          : `Using the built-in default (${def.fallback})`}
       </p>
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-5">
@@ -144,19 +177,26 @@ export default function AiConfigPage() {
       />
 
       {isLoading ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-64 animate-pulse rounded-2xl bg-slate-100" />
           ))}
         </div>
       ) : isError ? (
         <ErrorState title="Couldn’t load the settings" message={(error as Error).message} onRetry={() => refetch()} />
       ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {SETTINGS.map((def) => (
-            // key includes the saved value, so a card resets to the stored number after a refresh
-            <SettingCard key={`${def.name}:${byName.get(def.name)?.value ?? ""}`} def={def} current={byName.get(def.name)} />
-          ))}
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {SETTINGS.map((def) => {
+            const current = byName.get(def.name);
+            // key includes the stored value, so a card resets to the stored number after a refresh
+            return (
+              <SettingCard
+                key={`${def.name}:${current?.value ?? ""}:${current?.threshold ?? ""}`}
+                def={def}
+                current={current}
+              />
+            );
+          })}
         </div>
       )}
     </div>
