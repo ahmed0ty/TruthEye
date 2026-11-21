@@ -42,7 +42,7 @@
 
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.14.0" />
 
-    <PackageReference Include="QuestPDF" Version="2026.9.1" />
+    <PackageReference Include="QuestPDF" Version="2026.9.2" />
 
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
 
