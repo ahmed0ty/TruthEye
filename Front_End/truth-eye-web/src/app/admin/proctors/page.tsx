@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { TwoFactorResetButton } from "@/components/admin/two-factor-reset-button";
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, type FieldValues, type Resolver } from "react-hook-form";
@@ -161,6 +162,7 @@ export default function ProctorsPage() {
           <RowActions
             extra={
               <>
+                <TwoFactorResetButton userId={r.id} name={`${r.firstName} ${r.lastName}`} />
                 <button
                   type="button"
                   onClick={() => toggle.mutate(r)}

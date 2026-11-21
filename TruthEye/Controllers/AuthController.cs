@@ -101,7 +101,16 @@ namespace TruthEye.Controllers
             try
             {
                 var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-                var tokens = await _authService.LoginAsync(loginDto, ip, EnsureDeviceId());
+                var outcome = await _authService.BeginLoginAsync(loginDto, ip, EnsureDeviceId());
+                if (outcome.TwoFactorToken != null)
+                {
+                    return Success("Two-factor code required", new LoginResponse
+                    {
+                        TwoFactorRequired = true,
+                        TwoFactorToken = outcome.TwoFactorToken
+                    });
+                }
+                var tokens = outcome.Tokens!;
                 SetRefreshCookie(tokens.RefreshToken);
                 return Success("Login successful", new LoginResponse
                 {
@@ -120,6 +129,97 @@ namespace TruthEye.Controllers
                 _logger.LogError(ex, "Login failed unexpectedly for {Account}", AccountTag(loginDto.Email ?? loginDto.NationalId));
                 return Unauthorized(new ApiErrorResponse { Success = false, Error = "Login failed. Please try again.", ErrorCode = "AUTH_FAILED" });
             }
+        }
+
+        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
+        [HttpPost("login/2fa")]
+        public async Task<IActionResult> LoginWithTwoFactor([FromBody] TwoFactorLoginDto dto)
+        {
+            try
+            {
+                var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var tokens = await _authService.CompleteTwoFactorLoginAsync(dto.ChallengeToken, dto.Code, ip, EnsureDeviceId());
+                SetRefreshCookie(tokens.RefreshToken);
+                return Success("Login successful", new LoginResponse
+                {
+                    Token = tokens.AccessToken,
+                    MustChangePassword = tokens.MustChangePassword
+                });
+            }
+            catch (AppException ex)
+            {
+                _logger.LogWarning("Two-factor step rejected: {Message}", ex.Message);
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message, ErrorCode = ex.Code });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Two-factor login failed unexpectedly");
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = "Login failed. Please try again.", ErrorCode = "AUTH_FAILED" });
+            }
+        }
+
+        [Authorize]
+        [HttpGet("2fa")]
+        public async Task<IActionResult> GetTwoFactorStatus()
+        {
+            try
+            {
+                var enabled = await _authService.IsTwoFactorEnabledAsync(GetCurrentUserId());
+                return Success("Two-factor status", new { enabled });
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        [Authorize]
+        [EnableRateLimiting("auth")]
+        [HttpPost("2fa/setup")]
+        public async Task<IActionResult> BeginTwoFactorSetup()
+        {
+            try
+            {
+                var setup = await _authService.BeginTwoFactorSetupAsync(GetCurrentUserId());
+                return Success("Add the account to your authenticator app, then enter a code to turn it on", setup);
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        [Authorize]
+        [EnableRateLimiting("auth")]
+        [HttpPost("2fa/enable")]
+        public async Task<IActionResult> EnableTwoFactor([FromBody] TwoFactorCodeDto dto)
+        {
+            try
+            {
+                var codes = await _authService.EnableTwoFactorAsync(GetCurrentUserId(), dto.Code);
+                return Success("Two-factor sign-in is on. Save these recovery codes now; they won't be shown again.", new { recoveryCodes = codes });
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        [Authorize]
+        [EnableRateLimiting("auth")]
+        [HttpPost("2fa/disable")]
+        public async Task<IActionResult> DisableTwoFactor([FromBody] TwoFactorDisableDto dto)
+        {
+            try
+            {
+                await _authService.DisableTwoFactorAsync(GetCurrentUserId(), dto.Password, dto.Code);
+                return Success<object?>("Two-factor sign-in is off", null);
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.Dean)]
+        [HttpPost("users/{id:int}/2fa/reset")]
+        public async Task<IActionResult> ResetTwoFactor(int id)
+        {
+            try
+            {
+                await _authService.ResetTwoFactorAsync(id, GetCurrentUserId());
+                return Success<object?>("Two-factor sign-in was reset for this account", null);
+            }
+            catch (Exception ex) { return Fail(ex); }
         }
 
         [AllowAnonymous]
@@ -509,5 +609,7 @@ namespace TruthEye.Controllers
     {
         public string Token { get; set; } = string.Empty;
         public bool MustChangePassword { get; set; }
+        public bool TwoFactorRequired { get; set; }
+        public string? TwoFactorToken { get; set; }
     }
 }

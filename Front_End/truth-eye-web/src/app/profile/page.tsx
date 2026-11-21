@@ -1,5 +1,6 @@
 "use client";
 
+import { TwoFactorCard } from "@/components/profile/two-factor-card";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -120,6 +121,10 @@ export default function ProfilePage() {
             </div>
           </form>
         </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TwoFactorCard />
       </div>
     </div>
   );

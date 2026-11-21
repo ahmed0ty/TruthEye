@@ -36,6 +36,13 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   AUTH_DISABLED: "الحساب ده متعطّل. كلّم الإدارة",
   AUTH_OTHER_DEVICE: "الحساب ده مفتوح على جهاز تاني دلوقتي",
   AUTH_FAILED: "حصل خطأ في تسجيل الدخول، جرّب تاني",
+  AUTH_INVALID_2FA_CODE: "الكود غلط، جرّب تاني",
+  AUTH_CHALLENGE_EXPIRED: "انتهت خطوة الدخول، سجّل الدخول تاني",
+  AUTH_2FA_REQUIRED: "لازم تدخل كود التحقق",
+  AUTH_2FA_ALREADY_ON: "التحقق بخطوتين مفعّل بالفعل",
+  AUTH_2FA_NOT_ON: "التحقق بخطوتين مش مفعّل",
+  AUTH_2FA_NOT_STARTED: "ابدأ إعداد التحقق بخطوتين الأول",
+  AUTH_2FA_SELF: "لحسابك استخدم خيار الإيقاف في صفحة البروفايل",
 };
 
 function buildUrl(path: string, query?: Query) {
@@ -69,7 +76,7 @@ function errorMessage(body: any, status: number, isLogin = false): string {
 }
 
 export async function api<T = unknown>(path: string, opts: Options = {}): Promise<T> {
-  const isLogin = path === "/api/Auth/login";
+  const isLogin = path === "/api/Auth/login" || path === "/api/Auth/login/2fa";
 
   const send = async () => {
     const token = isLogin ? null : await ensureFreshToken();

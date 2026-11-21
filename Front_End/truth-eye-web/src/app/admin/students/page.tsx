@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { TwoFactorResetButton } from "@/components/admin/two-factor-reset-button";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -198,6 +199,7 @@ export default function StudentsPage() {
           <RowActions
             extra={
               <>
+                <TwoFactorResetButton userId={r.id} name={`${r.firstName} ${r.lastName}`} />
                 <button
                   type="button"
                   onClick={() => toggle.mutate(r)}

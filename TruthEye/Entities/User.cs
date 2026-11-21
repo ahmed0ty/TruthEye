@@ -15,6 +15,10 @@ namespace TruthEye.Entities
         public DateTime CreatedAt { get; set; }
         public bool IsActive { get; set; }
         public DateTime? LastLogin { get; set; }
+        public bool TwoFactorEnabled { get; set; }
+        public string? TotpSecretProtected { get; set; }   // سر TOTP مشفّر (AES-GCM)
+        public long? TotpLastStep { get; set; }            // آخر step اتصرف، عشان الكود ما يتعادش
+        public string? RecoveryCodeHashes { get; set; }    // SHA256 لأكواد الاسترجاع، مفصولة بفاصلة
         public int RoleId { get; set; }
         public virtual Role Role { get; set; }
         public virtual ICollection<ExamSession> ExamSessions { get; set; }

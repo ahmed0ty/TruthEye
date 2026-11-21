@@ -24,4 +24,22 @@ logout: (refreshToken: string) =>
     newPassword: string;
     confirmNewPassword: string;
   }) => api("/api/Auth/change-password", { method: "POST", body: d }),
+
+  // ---------- Two-factor sign-in ----------
+  loginWithTwoFactor: (d: { challengeToken: string; code: string }) =>
+    api<LoginResponse>("/api/Auth/login/2fa", { method: "POST", body: d }),
+
+  twoFactorStatus: () => api<{ enabled: boolean }>("/api/Auth/2fa"),
+
+  beginTwoFactorSetup: () =>
+    api<{ secret: string; otpAuthUri: string }>("/api/Auth/2fa/setup", { method: "POST" }),
+
+  enableTwoFactor: (code: string) =>
+    api<{ recoveryCodes: string[] }>("/api/Auth/2fa/enable", { method: "POST", body: { code } }),
+
+  disableTwoFactor: (d: { password: string; code: string }) =>
+    api("/api/Auth/2fa/disable", { method: "POST", body: d }),
+
+  resetTwoFactor: (userId: number) =>
+    api(`/api/Auth/users/${userId}/2fa/reset`, { method: "POST" }),
 };

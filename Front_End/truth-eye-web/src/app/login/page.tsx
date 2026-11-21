@@ -1,5 +1,6 @@
 "use client";
 
+import { TwoFactorForm } from "@/components/auth/two-factor-form";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const setSession = useAuth((s) => s.setSession);
   const [show, setShow] = useState(false);
   const [eye, setEye] = useState<EyeMode>("idle");
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   const {
     register,
@@ -40,23 +42,35 @@ export default function LoginPage() {
   // Leaving a field returns the eye to idle, but keeps an error or success on screen
   const settle = () => setEye((m) => (m === "error" || m === "success" ? m : "idle"));
 
+  // بعد ما الكود يتأكد (أو لو الحساب من غير 2FA)، الجلسة بتتفتح هنا
+  const finishSignIn = (token: string, mustChangePassword: boolean) => {
+    const user = setSession(token);
+    if (!user) throw new Error("Invalid token");
+
+    setEye("success");
+    toast.success(`Welcome ${user.name}`);
+    router.replace(mustChangePassword ? "/change-password" : (ROLE_HOME[user.role] ?? "/login"));
+    router.refresh();
+  };
+
   const onSubmit = async ({ identifier, password }: FormValues) => {
     setEye("watching");
     try {
       const isEmail = identifier.includes("@");
-      const { token, mustChangePassword } = await authApi.login({
+      const res = await authApi.login({
         email: isEmail ? identifier : undefined,
         nationalId: isEmail ? undefined : identifier,
         password,
       });
 
-      const user = setSession(token);
-      if (!user) throw new Error("Invalid token");
+      // الحساب عليه 2FA: الباسورد اتقبل، ونستنى الكود
+      if (res.twoFactorRequired && res.twoFactorToken) {
+        setChallenge(res.twoFactorToken);
+        setEye("idle");
+        return;
+      }
 
-      setEye("success");
-      toast.success(`Welcome ${user.name}`);
-      router.replace(mustChangePassword ? "/change-password" : (ROLE_HOME[user.role] ?? "/login"));
-      router.refresh();
+      finishSignIn(res.token, !!res.mustChangePassword);
     } catch (e) {
       setEye("error");
       toast.error(e instanceof Error ? e.message : "Login failed");
@@ -76,6 +90,16 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {challenge ? (
+          <TwoFactorForm
+            challengeToken={challenge}
+            onVerified={({ token, mustChangePassword }) => finishSignIn(token, mustChangePassword)}
+            onBack={() => {
+              setChallenge(null);
+              setEye("idle");
+            }}
+          />
+        ) : (
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="animate-fade-up mt-6 space-y-4"
@@ -148,6 +172,7 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+        )}
 
         <div
           className="animate-fade-up mt-6 border-t border-slate-200 pt-5"
