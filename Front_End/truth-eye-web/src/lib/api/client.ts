@@ -27,6 +27,15 @@ interface Options {
 // رسائل عربي مقابلة لأكواد الأخطاء اللي بيرجّعها الباك
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   PASSWORD_CHANGE_REQUIRED: "لازم تغيّر كلمة المرور الأول",
+  EXAM_COURSE_NOT_TEACHING: "تقدر تضيف امتحانات للمواد اللي بتدرّسها بس",
+  EXAM_HAS_ATTEMPTS: "الامتحان ده فيه محاولات، فمينفعش ينتقل لمادة تانية",
+  EXAM_TIMING_LOCKED: "فيه طلاب بيمتحنوا دلوقتي، مينفعش تغيّر الوقت أو الدرجات لحد ما يخلّصوا",
+  COURSE_ACTION_FAILED: "حصل خطأ في العملية دي، جرّب تاني",
+  AUTH_INVALID_CREDENTIALS: "الرقم أو كلمة المرور غلط",
+  AUTH_LOCKED: "محاولات كتير غلط. استنى شوية وجرّب تاني",
+  AUTH_DISABLED: "الحساب ده متعطّل. كلّم الإدارة",
+  AUTH_OTHER_DEVICE: "الحساب ده مفتوح على جهاز تاني دلوقتي",
+  AUTH_FAILED: "حصل خطأ في تسجيل الدخول، جرّب تاني",
 };
 
 function buildUrl(path: string, query?: Query) {
@@ -39,11 +48,11 @@ function buildUrl(path: string, query?: Query) {
   return url.toString();
 }
 
-function errorMessage(body: any, status: number): string {
+function errorMessage(body: any, status: number, isLogin = false): string {
   const code = body?.errorCode;
   if (code && ERROR_CODE_MESSAGES[code]) return ERROR_CODE_MESSAGES[code];
 
-  if (status === 401) return "انتهت الجلسة، سجّل الدخول تاني";
+  if (status === 401 && !isLogin) return "انتهت الجلسة، سجّل الدخول تاني";
   if (status === 403) return "مش مسموحلك بالعملية دي";
   if (status === 404) return "مش لاقي اللي بتدوّر عليه";
   if (status >= 500) return "حصل خطأ في السيرفر";
@@ -119,7 +128,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
       window.location.href = "/change-password";
     }
 
-    throw new ApiError(errorMessage(body, res.status), res.status, body?.errors, body?.errorCode);
+    throw new ApiError(errorMessage(body, res.status, isLogin), res.status, body?.errors, body?.errorCode);
   }
 
   if (body && typeof body === "object" && !Array.isArray(body) && "success" in body && "data" in body) {

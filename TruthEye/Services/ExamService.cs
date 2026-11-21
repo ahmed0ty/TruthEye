@@ -871,7 +871,7 @@ namespace TruthEye.Services
             {
                 await EnsureTeachesCourseAsync(updateExamDto.CourseId, exam.DoctorId);
                 if (await _unitOfWork.Repository<ExamSession>().CountAsync(s => s.ExamId == examId) > 0)
-                    throw new BadRequestException("This exam already has attempts, so it can't be moved to another course");
+                    throw new BadRequestException("This exam already has attempts, so it can't be moved to another course", "EXAM_HAS_ATTEMPTS");
             }
 
             // Students who are taking it now must not get their time or marks changed under them
@@ -882,7 +882,7 @@ namespace TruthEye.Services
                 || updateExamDto.TotalMarks != exam.TotalMarks;
             if (timingChanged && await _unitOfWork.Repository<ExamSession>()
                     .CountAsync(s => s.ExamId == examId && s.Status == "InProgress") > 0)
-                throw new BadRequestException("Students are taking this exam now, so its time and marks can't be changed until they finish");
+                throw new BadRequestException("Students are taking this exam now, so its time and marks can't be changed until they finish", "EXAM_TIMING_LOCKED");
 
             // The mapping can reset Status to "Draft", so keep the current value
             var currentStatus = exam.Status;
@@ -1200,7 +1200,7 @@ namespace TruthEye.Services
             var teaches = await _unitOfWork.Repository<Course>()
                 .CountAsync(c => c.Id == courseId && c.Instructors.Any(d => d.Id == doctorId));
             if (teaches == 0)
-                throw new ForbiddenException("You can only add exams to courses you teach");
+                throw new ForbiddenException("You can only add exams to courses you teach", "EXAM_COURSE_NOT_TEACHING");
         }
 
         private async Task InvalidateExamCaches(int courseId)
