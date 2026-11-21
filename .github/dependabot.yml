@@ -6,11 +6,23 @@ updates:
       - "/TruthEye.Tests"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Major upgrades change behaviour (mapping rules); review and test them by hand
+      - dependency-name: "AutoMapper"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/Front_End/truth-eye-web"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
       # typescript-eslint does not support TypeScript 7 yet; take major TypeScript upgrades manually
       - dependency-name: "typescript"
@@ -25,3 +37,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
