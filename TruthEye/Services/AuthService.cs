@@ -1180,8 +1180,9 @@ namespace TruthEye.Services
             if (record == null || record.UsedAt != null || record.ExpiresAt < now)
                 throw new BadRequestException(invalid);
 
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == record.UserId)
-                ?? throw new BadRequestException(invalid);
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == record.UserId);
+            if (user == null || user.IsDeleted || !user.IsActive)
+                throw new BadRequestException(invalid);
 
             if (VerifyPassword(newPassword, user.PasswordHash))
                 throw new BadRequestException("The new password must be different from the old one");
@@ -1198,6 +1199,14 @@ namespace TruthEye.Services
                 .ForEachAsync(s => s.EndedAt = now);
 
             await _db.SaveChangesAsync();
+        }
+
+        // Login audit rows keep only a hint of the account, never the full email or national ID
+        private static string MaskAccount(string? account)
+        {
+            if (string.IsNullOrWhiteSpace(account)) return "unknown";
+            if (account.Contains('@')) return MaskEmail(account);
+            return account.Length <= 4 ? "****" : "***" + account[^4..];
         }
 
         private static string MaskEmail(string email)
@@ -1539,7 +1548,7 @@ namespace TruthEye.Services
                 Action = action,
                 EntityType = ActivityEntities.Login,
                 EntityId = user?.Id,
-                Description = $"{text} ({account}) from {ip}",
+                Description = $"{text} ({MaskAccount(account)}) from {ip}",
                 IpAddress = ip
             });
         }

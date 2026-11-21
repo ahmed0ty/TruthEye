@@ -69,6 +69,11 @@ namespace TruthEye.Controllers
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(message) || message.Length > 500)
+                    return BadRequest(new { Error = "Message must be 1 to 500 characters" });
+                if (type is { Length: > 30 })
+                    return BadRequest(new { Error = "Notification type is too long" });
+
                 var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
 
                 // الدعم الفني بيبعت لأي حد. العميد والأمين لأعضاء كليتهم بس.

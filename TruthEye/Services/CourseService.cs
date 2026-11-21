@@ -88,7 +88,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating course by Admin {AdminId}", adminId);
-                throw new BadRequestException($"Error creating course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -144,7 +144,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating course {CourseId} by Admin {AdminId}", courseId, adminId);
-                throw new BadRequestException($"Error updating course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -182,7 +182,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting course {CourseId} by Admin {AdminId}", courseId, adminId);
-                throw new BadRequestException($"Error deleting course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -265,7 +265,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error assigning doctor {DoctorId} to course {CourseId}", doctorId, courseId);
-                throw new BadRequestException($"Error assigning doctor to course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -302,7 +302,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error removing doctor {DoctorId} from course {CourseId}", doctorId, courseId);
-                throw new BadRequestException($"Error removing doctor from course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -356,7 +356,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error assigning student {StudentId} to course {CourseId}", studentId, courseId);
-                throw new BadRequestException($"Error assigning student to course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 
@@ -393,7 +393,7 @@ namespace TruthEye.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error removing student {StudentId} from course {CourseId}", studentId, courseId);
-                throw new BadRequestException($"Error removing student from course: {ex.Message}");
+                throw new BadRequestException("Couldn't complete this course action. Please try again.");
             }
         }
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
+using TruthEye.Exceptions;
 using TruthEye.Middleware;
 using TruthEye.Security;
 using TruthEye.Services;
@@ -83,6 +84,15 @@ namespace TruthEye.Controllers
 
         #region Authentication
 
+        // Logs keep a short hash of the login name, never the name itself
+        private static string AccountTag(string? account)
+        {
+            if (string.IsNullOrWhiteSpace(account)) return "unknown";
+            var hash = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(account.Trim().ToLowerInvariant()));
+            return Convert.ToHexString(hash)[..12];
+        }
+
         [AllowAnonymous]
         [EnableRateLimiting("auth")]
         [HttpPost("login")]
@@ -99,10 +109,16 @@ namespace TruthEye.Controllers
                     MustChangePassword = tokens.MustChangePassword
                 });
             }
+            catch (AppException ex)
+            {
+                // Lockout, disabled-account and other-device messages are written for the user
+                _logger.LogWarning("Login rejected for {Account}: {Message}", AccountTag(loginDto.Email ?? loginDto.NationalId), ex.Message);
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message });
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning("Login failed for {Account}: {Message}", loginDto.Email ?? loginDto.NationalId, ex.Message);
-                return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message });
+                _logger.LogError(ex, "Login failed unexpectedly for {Account}", AccountTag(loginDto.Email ?? loginDto.NationalId));
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = "Login failed. Please try again." });
             }
         }
 

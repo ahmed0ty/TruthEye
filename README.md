@@ -115,6 +115,12 @@ dotnet test
 - Dependencies are monitored with Dependabot, CodeQL scans run weekly, and CI blocks packages with known vulnerabilities.
 - To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
+## Known limits
+
+- Exam presence and the per-session closing lock live in process memory, so the API must run as a single instance. Moving to several instances needs a shared store for both.
+- Profile photos are served from `wwwroot/uploads/profiles` with random file names. Anyone holding the link can open the photo.
+- Deleting a dean, secretary or support account only deactivates it, so their history stays intact.
+
 ## License
 
 No license has been chosen yet. All rights are reserved by the author until one is added.

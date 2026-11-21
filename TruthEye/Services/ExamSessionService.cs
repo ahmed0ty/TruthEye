@@ -29,6 +29,75 @@ namespace TruthEye.Services
             _notifications = notifications;
         }
 
+        // One closing action (submit, leave, timeout) per session at a time.
+        // In-process only, which matches the single API instance this app runs on (see ExamPresence).
+        private sealed class SessionGate
+        {
+            public readonly SemaphoreSlim Turn = new(1, 1);
+            public int Waiting;
+        }
+
+        private static readonly Dictionary<int, SessionGate> SessionGates = new();
+        private static readonly object GatesSync = new();
+
+        private static async Task<T> UnderSessionLockAsync<T>(int sessionId, Func<Task<T>> work)
+        {
+            SessionGate gate;
+            lock (GatesSync)
+            {
+                if (!SessionGates.TryGetValue(sessionId, out var existing))
+                {
+                    existing = new SessionGate();
+                    SessionGates[sessionId] = existing;
+                }
+                existing.Waiting++;
+                gate = existing;
+            }
+
+            try
+            {
+                await gate.Turn.WaitAsync();
+                try
+                {
+                    return await work();
+                }
+                finally
+                {
+                    gate.Turn.Release();
+                }
+            }
+            finally
+            {
+                lock (GatesSync)
+                {
+                    gate.Waiting--;
+                    if (gate.Waiting == 0) SessionGates.Remove(sessionId);
+                }
+            }
+        }
+
+        // Counts in the database, so a session another request already closed is seen as closed
+        // even when this request loaded it earlier as InProgress
+        private async Task<bool> IsStillOpenAsync(int sessionId) =>
+            await _unitOfWork.Repository<ExamSession>()
+                .CountAsync(s => s.Id == sessionId && s.Status == "InProgress") > 0;
+
+        public Task<ExamResultDto> SubmitExamSessionAsync(int sessionId) =>
+            UnderSessionLockAsync(sessionId, () => SubmitExamSessionCoreAsync(sessionId));
+
+        private async Task AutoSubmitSession(ExamSession session)
+        {
+            await UnderSessionLockAsync(session.Id, async () =>
+            {
+                await AutoSubmitCoreAsync(session);
+                return true;
+            });
+        }
+
+        private Task<ExamResultDto> TerminateSessionInternalAsync(
+            ExamSession session, string reason, LeaveAnswer? currentAnswer) =>
+            UnderSessionLockAsync(session.Id, () => TerminateSessionCoreAsync(session, reason, currentAnswer));
+
         public async Task<ExamSessionDto> GetExamSessionByIdAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
@@ -88,12 +157,12 @@ namespace TruthEye.Services
             return _mapper.Map<ExamSessionDto>(session);
         }
 
-        public async Task<ExamSessionDto> ContinueExamSessionAsync(int sessionId)
+        public async Task<ExamSessionDto> ContinueExamSessionAsync(int sessionId, int studentId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!, s => s.Answers!);
 
-            if (session == null)
+            if (session == null || session.StudentId != studentId)
                 throw new NotFoundException("Session not found");
 
             if (session.Status != "InProgress")
@@ -140,13 +209,15 @@ namespace TruthEye.Services
             };
         }
 
-        public async Task<ExamResultDto> SubmitExamSessionAsync(int sessionId)
+        private async Task<ExamResultDto> SubmitExamSessionCoreAsync(int sessionId)
         {
             var session = await _unitOfWork.Repository<ExamSession>()
                 .GetByIdAsync(sessionId, s => s.Exam!);
 
             if (session == null)
                 throw new NotFoundException("Session not found");
+            if (!await IsStillOpenAsync(sessionId))
+                throw new BadRequestException("Session is not in progress");
 
             if (session.Status != "InProgress")
                 throw new BadRequestException("Session is not in progress");
@@ -531,9 +602,9 @@ namespace TruthEye.Services
             return (totalScore, correct);
         }
 
-        private async Task AutoSubmitSession(ExamSession session)
+        private async Task AutoSubmitCoreAsync(ExamSession session)
         {
-            if (session.Status != "InProgress") return;
+            if (session.Status != "InProgress" || !await IsStillOpenAsync(session.Id)) return;
 
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(session.ExamId);
             if (exam == null) return;
@@ -721,11 +792,11 @@ namespace TruthEye.Services
 
         }
 
-        private async Task<ExamResultDto> TerminateSessionInternalAsync(
+        private async Task<ExamResultDto> TerminateSessionCoreAsync(
             ExamSession session, string reason, LeaveAnswer? currentAnswer)
         {
             // already closed (submitted, timed out or terminated): just return the result
-            if (session.Status != "InProgress")
+            if (session.Status != "InProgress" || !await IsStillOpenAsync(session.Id))
                 return await GetExamResultAsync(session.Id);
 
             var exam = session.Exam ?? await _unitOfWork.Repository<Exam>().GetByIdAsync(session.ExamId);
