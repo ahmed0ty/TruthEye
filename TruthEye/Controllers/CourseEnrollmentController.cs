@@ -23,7 +23,6 @@ namespace TruthEye.Controllers
 
         private int Me => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-        [Authorize(Roles = AppRoles.Managers)]
         [HttpPost("bulk")]
         public async Task<IActionResult> Enroll(int courseId, [FromBody] BulkEnrollRequest request)
         {
@@ -42,7 +41,6 @@ namespace TruthEye.Controllers
             catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(Enroll)); }
         }
 
-        [Authorize(Roles = AppRoles.Managers)]
         [HttpPost("bulk-remove")]
         public async Task<IActionResult> Unenroll(int courseId, [FromBody] List<int> studentIds)
         {

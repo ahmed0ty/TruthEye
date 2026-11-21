@@ -34,7 +34,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Create new course", OperationId = "CreateCourse")]
         [ProducesResponseType(typeof(ApiResponse<CourseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> CreateCourse([FromBody] CreateCourseDto createCourseDto)
         {
             try
@@ -56,7 +55,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Update course", OperationId = "UpdateCourse")]
         [ProducesResponseType(typeof(ApiResponse<CourseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseDto updateCourseDto)
         {
             try
@@ -145,7 +143,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Assign doctor to course", OperationId = "AssignDoctorToCourse")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> AssignDoctorToCourse(int courseId, int doctorId)
         {
             try
@@ -167,7 +164,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Remove doctor from course", OperationId = "RemoveDoctorFromCourse")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> RemoveDoctorFromCourse(int courseId, int doctorId)
         {
             try
@@ -213,7 +209,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Assign student to course", OperationId = "AssignStudentToCourse")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> AssignStudentToCourse(int courseId, int studentId)
         {
             try
@@ -235,7 +230,6 @@ namespace TruthEye.Controllers
         [SwaggerOperation(Summary = "Remove student from course", OperationId = "RemoveStudentFromCourse")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = AppRoles.Managers)]
         public async Task<IActionResult> RemoveStudentFromCourse(int courseId, int studentId)
         {
             try
