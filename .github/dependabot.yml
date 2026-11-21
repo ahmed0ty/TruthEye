@@ -11,6 +11,10 @@ updates:
     directory: "/Front_End/truth-eye-web"
     schedule:
       interval: "weekly"
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet; take major TypeScript upgrades manually
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/TruthEye/AI-BERT-Service"
