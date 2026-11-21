@@ -16,7 +16,7 @@ import { ROLE_HOME } from "@/types/api";
 import { IntroGate } from "@/components/auth/intro-gate";
 const schema = z.object({
   identifier: z.string().trim().min(1, "Enter your email or national ID"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Enter your password"),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -34,18 +34,18 @@ export default function LoginPage() {
   const onSubmit = async ({ identifier, password }: FormValues) => {
     try {
       const isEmail = identifier.includes("@");
-      const { token, refreshToken } = await authApi.login({
-        email: isEmail ? identifier : undefined,
-        nationalId: isEmail ? undefined : identifier,
-        password,
-      });
+const { token, mustChangePassword } = await authApi.login({
+  email: isEmail ? identifier : undefined,
+  nationalId: isEmail ? undefined : identifier,
+  password,
+});
 
-      const user = setSession(token, refreshToken);
-      if (!user) throw new Error("Invalid token");
+const user = setSession(token);
+if (!user) throw new Error("Invalid token");
 
-      toast.success(`Welcome ${user.name}`);
-      router.replace(ROLE_HOME[user.role] ?? "/login");
-      router.refresh();
+toast.success(`Welcome ${user.name}`);
+router.replace(mustChangePassword ? "/change-password" : (ROLE_HOME[user.role] ?? "/login"));
+router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Login failed");
     }

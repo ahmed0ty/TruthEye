@@ -10,8 +10,9 @@ export const authApi = {
   login: (data: LoginRequest) =>
     api<LoginResponse>("/api/Auth/login", { method: "POST", body: data }),
 
-  logout: (refreshToken: string) =>
-    api<boolean>("/api/Auth/logout", { method: "POST", body: { refreshToken } }),
+  // امسح الدالتين دول:
+logout: (refreshToken: string) =>
+  api<boolean>("/api/Auth/logout", { method: "POST", body: { refreshToken } }),
 
   profile: () => api<UserProfile>("/api/Auth/profile"),
 

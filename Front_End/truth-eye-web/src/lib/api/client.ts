@@ -1,5 +1,5 @@
 import { ensureFreshToken, refreshTokens } from "@/lib/auth/refresh";
-import { clearToken, getRefresh } from "@/lib/auth/storage";
+import { clearToken, hasSession } from "@/lib/auth/storage";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5210";
 
@@ -7,7 +7,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public validation?: Record<string, string[]>
+    public validation?: Record<string, string[]>,
+    public errorCode?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -23,6 +24,11 @@ interface Options {
   signal?: AbortSignal;
 }
 
+// رسائل عربي مقابلة لأكواد الأخطاء اللي بيرجّعها الباك
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+  PASSWORD_CHANGE_REQUIRED: "لازم تغيّر كلمة المرور الأول",
+};
+
 function buildUrl(path: string, query?: Query) {
   const url = new URL(path, BASE_URL);
   if (query) {
@@ -34,6 +40,14 @@ function buildUrl(path: string, query?: Query) {
 }
 
 function errorMessage(body: any, status: number): string {
+  const code = body?.errorCode;
+  if (code && ERROR_CODE_MESSAGES[code]) return ERROR_CODE_MESSAGES[code];
+
+  if (status === 401) return "انتهت الجلسة، سجّل الدخول تاني";
+  if (status === 403) return "مش مسموحلك بالعملية دي";
+  if (status === 404) return "مش لاقي اللي بتدوّر عليه";
+  if (status >= 500) return "حصل خطأ في السيرفر";
+
   if (body?.error) return body.error;
   if (body?.message) return body.message;
   if (body?.errors) {
@@ -41,9 +55,7 @@ function errorMessage(body: any, status: number): string {
     if (first?.[0]) return first[0];
   }
   if (body?.title) return body.title;
-  if (status === 401) return "انتهت الجلسة، سجّل الدخول تاني";
-  if (status === 403) return "مش مسموحلك بالعملية دي";
-  if (status >= 500) return "حصل خطأ في السيرفر";
+
   return "حصل خطأ غير متوقع";
 }
 
@@ -54,6 +66,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
     const token = isLogin ? null : await ensureFreshToken();
     return fetch(buildUrl(path, opts.query), {
       method: opts.method ?? "GET",
+      credentials: "include",
       headers: {
         ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -72,7 +85,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   }
 
   // Expired token: refresh once and retry the same request
-  if (res.status === 401 && !isLogin && getRefresh()) {
+  if (res.status === 401 && !isLogin && hasSession()) {
     const fresh = await refreshTokens();
     if (fresh) {
       try {
@@ -92,14 +105,23 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   }
 
   if (!res.ok || body?.success === false) {
-    if (res.status === 401 && !isLogin && !getRefresh() && typeof window !== "undefined") {
+    if (res.status === 401 && !isLogin && !hasSession() && typeof window !== "undefined") {
       clearToken();
       window.location.href = "/login";
     }
-    throw new ApiError(errorMessage(body, res.status), res.status, body?.errors);
+
+    if (
+      res.status === 403 &&
+      body?.errorCode === "PASSWORD_CHANGE_REQUIRED" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/change-password"
+    ) {
+      window.location.href = "/change-password";
+    }
+
+    throw new ApiError(errorMessage(body, res.status), res.status, body?.errors, body?.errorCode);
   }
 
-  // فك الـ wrapper: { success, message, data } -> data
   if (body && typeof body === "object" && !Array.isArray(body) && "success" in body && "data" in body) {
     return body.data as T;
   }

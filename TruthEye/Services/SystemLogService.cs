@@ -95,7 +95,10 @@ namespace TruthEye.Services
             var q = _db.SystemLogs.AsNoTracking().AsQueryable();
 
             if (f.FacultyId.HasValue) q = q.Where(l => l.FacultyId == f.FacultyId.Value);
-            if (!string.IsNullOrWhiteSpace(f.EntityType)) q = q.Where(l => l.EntityType == f.EntityType);
+            if (!string.IsNullOrWhiteSpace(f.EntityType))
+    q = q.Where(l => l.EntityType == f.EntityType);
+else
+    q = q.Where(l => l.EntityType != ActivityEntities.Login);
             if (!string.IsNullOrWhiteSpace(f.Action)) q = q.Where(l => l.Action == f.Action);
             if (f.ActorId.HasValue) q = q.Where(l => l.AdminId == f.ActorId.Value);
             if (f.From.HasValue) q = q.Where(l => l.Timestamp >= f.From.Value);

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Ban, CheckCircle2, Upload } from "lucide-react";
+import { Ban, CheckCircle2, KeyRound, Upload } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -15,9 +15,11 @@ import { SelectField, SubmitButton, TextField } from "@/components/ui/form-field
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
+import { ResetPasswordDialog, type ResetTarget } from "@/components/admin/reset-password-dialog";
 import { adminApi } from "@/lib/api/admin";
 import { YEARS, labelOf } from "@/lib/enums";
 import { useDelete } from "@/hooks/use-crud";
+import { useServerTable } from "@/hooks/use-server-table";
 import { useAuth } from "@/lib/auth/store";
 import type { Student } from "@/types/admin";
 
@@ -32,7 +34,6 @@ const base = z.object({
 const createSchema = base.extend({
   email: z.string().trim().email("Invalid email"),
   nationalId: z.string().regex(/^\d{14}$/, "Must be 14 digits"),
-  password: z.string().min(6, "At least 6 characters"),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
@@ -64,7 +65,7 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateStudent(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStudent(v),
+      editing ? adminApi.updateStudent(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStudent({ ...v, sendSetupLink: true }),
     onSuccess: () => {
       toast.success(editing ? "Student updated" : "Student created");
       qc.invalidateQueries({ queryKey: ["students"] });
@@ -88,7 +89,7 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <TextField label="Password" type="password" dir="ltr" error={err("password")} {...register("password")} />
+            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
         </>
       )}
@@ -115,11 +116,21 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
 
 export default function StudentsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: Student | null }>({ open: false, editing: null });
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["students"], queryFn: adminApi.studentList });
-  const del = useDelete<Student>(["students"], adminApi.deleteStudent, "Student deleted");
- const user = useAuth((s) => s.user);
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
+  const user = useAuth((s) => s.user);
   const canDelete = user?.role === "Admin" || user?.role === "FacultySecretary";
   const qc = useQueryClient();
+
+  const table = useServerTable(10);
+  const departments = useQuery({ queryKey: ["departments"], queryFn: adminApi.departments });
+
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ["students", "paged", table.params],
+    queryFn: () => adminApi.studentsPaged(table.params),
+    placeholderData: keepPreviousData,
+  });
+
+  const del = useDelete<Student>(["students"], adminApi.deleteStudent, "Student deleted");
   const toggle = useMutation({
     mutationFn: (s: Student) => (s.isActive ? adminApi.disableStudent(s.id) : adminApi.enableStudent(s.id)),
     onSuccess: (_d, s) => {
@@ -128,16 +139,6 @@ export default function StudentsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-  const [f, setF] = useState({ dept: "all", year: "all", status: "all" });
-
-  const all = data ?? [];
-  const depts = [...new Set(all.map((s) => s.departmentName).filter(Boolean))].sort();
-  const rows = all.filter(
-    (s) =>
-      (f.dept === "all" || s.departmentName === f.dept) &&
-      (f.year === "all" || String(s.year) === f.year) &&
-      (f.status === "all" || (f.status === "active") === s.isActive)
-  );
 
   return (
     <div className="space-y-6">
@@ -158,41 +159,66 @@ export default function StudentsPage() {
       />
 
       <DataTable
-        rows={rows}
+        rows={data?.items ?? []}
         loading={isLoading}
         error={error ? (error as Error).message : undefined}
         onRetry={() => refetch()}
-        searchText={(r) => `${r.firstName} ${r.lastName} ${r.email} ${r.nationalId} ${r.departmentName}`}
+        server={table.bind(data?.total ?? 0, isFetching)}
         placeholder="Search by name, email or national ID..."
         toolbar={
           <>
-            <FilterSelect label="Department" value={f.dept} onChange={(v) => setF({ ...f, dept: v })} options={depts.map((d) => ({ value: d, label: d }))} />
-            <FilterSelect label="Year" value={f.year} onChange={(v) => setF({ ...f, year: v })} options={YEARS.map((y) => ({ value: String(y.value), label: y.label }))} />
-            <FilterSelect label="Status" value={f.status} onChange={(v) => setF({ ...f, status: v })} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
+            <FilterSelect
+              label="Department"
+              value={table.filters.departmentId ?? "all"}
+              onChange={(v) => table.setFilter("departmentId", v)}
+              options={(departments.data ?? []).map((d) => ({ value: String(d.id), label: d.name }))}
+            />
+            <FilterSelect
+              label="Year"
+              value={table.filters.year ?? "all"}
+              onChange={(v) => table.setFilter("year", v)}
+              options={YEARS.map((y) => ({ value: String(y.value), label: y.label }))}
+            />
+            <FilterSelect
+              label="Status"
+              value={table.filters.status ?? "all"}
+              onChange={(v) => table.setFilter("status", v)}
+              options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+            />
           </>
         }
         columns={[
-          { header: "Student", sortValue: (r) => `${r.firstName} ${r.lastName}`, cell: (r) => <PersonCell first={r.firstName} last={r.lastName} email={r.email} /> },
+          { header: "Student", sortKey: "name", cell: (r) => <PersonCell first={r.firstName} last={r.lastName} email={r.email} /> },
           { header: "National ID", cell: (r) => <span dir="ltr" className="text-slate-600">{r.nationalId}</span> },
-          { header: "Department", sortValue: (r) => r.departmentName, cell: (r) => r.departmentName || "—" },
-          { header: "Year", sortValue: (r) => r.year, cell: (r) => labelOf(YEARS, r.year) },
-          { header: "Status", sortValue: (r) => Number(r.isActive), cell: (r) => <StatusBadge active={r.isActive} /> },
+          { header: "Department", sortKey: "department", cell: (r) => r.departmentName || "—" },
+          { header: "Year", sortKey: "year", cell: (r) => labelOf(YEARS, r.year) },
+          { header: "Status", sortKey: "status", cell: (r) => <StatusBadge active={r.isActive} /> },
         ]}
         actions={(r) => (
-          <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => toggle.mutate(r)}
-              title={r.isActive ? "Disable" : "Enable"}
-              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
-            >
-              {r.isActive ? <Ban size={16} /> : <CheckCircle2 size={16} />}
-            </button>
-            <RowActions
-              onEdit={() => setModal({ open: true, editing: r })}
-              onDelete={canDelete ? () => del.setTarget(r) : undefined}
-            />
-          </div>
+          <RowActions
+            extra={
+              <>
+                <button
+                  type="button"
+                  onClick={() => toggle.mutate(r)}
+                  title={r.isActive ? "Disable" : "Enable"}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  {r.isActive ? <Ban size={17} /> : <CheckCircle2 size={17} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setResetTarget({ id: r.id, name: `${r.firstName} ${r.lastName}` })}
+                  title="Reset password"
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <KeyRound size={17} />
+                </button>
+              </>
+            }
+            onEdit={() => setModal({ open: true, editing: r })}
+            onDelete={canDelete ? () => del.setTarget(r) : undefined}
+          />
         )}
       />
 
@@ -212,6 +238,8 @@ export default function StudentsPage() {
         onCancel={() => del.setTarget(null)}
         onConfirm={() => del.target && del.mutation.mutate(del.target.id)}
       />
+
+      <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
     </div>
   );
 }

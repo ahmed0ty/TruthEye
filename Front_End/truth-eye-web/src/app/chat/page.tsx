@@ -7,6 +7,8 @@ import { ArrowLeft, MessageSquare, RefreshCw, Search, Send } from "lucide-react"
 import { chatApi } from "@/lib/api/chat";
 import { useAuth } from "@/lib/auth/store";
 import { useChatHub } from "@/hooks/use-chat-hub";
+import { useChatStatus } from "@/hooks/use-chat-status";
+import { ChatClosed } from "@/components/chat/chat-closed";
 import { fmtDateTime, parseDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Contact } from "@/types/chat";
@@ -21,6 +23,7 @@ export default function ChatPage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
   const hub = useChatHub(user?.id);
+  const status = useChatStatus();
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -68,6 +71,9 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, activeId]);
+
+  // الشات مقفول أثناء الامتحان (بعد كل الـ hooks)
+  if (status.data?.locked) return <ChatClosed until={status.data.until} />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -4,7 +4,7 @@ namespace TruthEye.DTOs
 {
     public class CreateQuestionDto
     {
-        [Required]
+        [Required, StringLength(4000)]
         public string QuestionText { get; set; } = string.Empty;
 
         [Required]
@@ -13,7 +13,7 @@ namespace TruthEye.DTOs
         [Range(1, int.MaxValue)]
         public int Marks { get; set; }
 
-        [Required]
+        [Range(1, int.MaxValue)]
         public int ExamId { get; set; }
 
         // MCQ only

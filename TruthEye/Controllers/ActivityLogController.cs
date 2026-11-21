@@ -1,3 +1,4 @@
+﻿using TruthEye.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -58,7 +59,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to load activity log");
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetLogs");
             }
         }
 
@@ -83,7 +84,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Revert of log {LogId} failed", id);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Revert");
             }
         }
     }

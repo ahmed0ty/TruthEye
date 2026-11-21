@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -19,4 +19,5 @@ COPY sbert_server.py .
 
 EXPOSE 8000
 
+ENV SBERT_HOST=0.0.0.0
 CMD ["python", "sbert_server.py"]

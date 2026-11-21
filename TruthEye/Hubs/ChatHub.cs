@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using TruthEye.Entities;
+using TruthEye.Entities.Data;
+using TruthEye.Security;
+using TruthEye.Services;
 using TruthEye.UnitOfWorkk;
 
 namespace TruthEye.API.Hubs
@@ -11,12 +14,18 @@ namespace TruthEye.API.Hubs
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ChatHub> _logger;
+        private readonly IChatLockService _lock;
 
-        public ChatHub(IUnitOfWork unitOfWork, ILogger<ChatHub> logger)
+        public ChatHub(IUnitOfWork unitOfWork, ILogger<ChatHub> logger, IChatLockService chatLock)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _lock = chatLock;
         }
+
+        private async Task<bool> IsLockedAsync(User a, User b) =>
+            (await _lock.GetAsync(ChatRules.FacultyOf(a))).Locked
+            || (await _lock.GetAsync(ChatRules.FacultyOf(b))).Locked;
 
         public override async Task OnConnectedAsync()
         {
@@ -64,6 +73,19 @@ namespace TruthEye.API.Hubs
                     return;
                 }
 
+                var sender = await _unitOfWork.Repository<User>().GetByIdAsync(senderId);
+                if (sender == null || !sender.IsActive || !await ChatRules.CanChat(_unitOfWork, sender, receiver))
+                {
+                    await Clients.Caller.SendAsync("Error", "You can't message this user");
+                    return;
+                }
+
+                if (await IsLockedAsync(sender, receiver))
+                {
+                    await Clients.Caller.SendAsync("Error", "Chat is closed while an exam is running");
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(message) || message.Length > 1000)
                 {
                     await Clients.Caller.SendAsync("Error", "Invalid message");
@@ -107,61 +129,15 @@ namespace TruthEye.API.Hubs
             }
         }
 
-        public async Task SendGroupMessage(string groupId, string message)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(groupId) ||
-                    groupId.StartsWith("user:") ||
-                    groupId.StartsWith("role:"))
-                {
-                    await Clients.Caller.SendAsync("Error", "Invalid group");
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(message) || message.Length > 1000)
-                {
-                    await Clients.Caller.SendAsync("Error", "Invalid message");
-                    return;
-                }
-
-                var senderId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var senderName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
-
-                await Clients.Group(groupId).SendAsync("ReceiveGroupMessage", new
-                {
-                    senderId,
-                    senderName,
-                    message,
-                    sentAt = DateTime.UtcNow
-                });
-
-                _logger.LogInformation("Group message sent to {GroupId} by {SenderId}", groupId, senderId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending group message");
-            }
-        }
-
-        public async Task JoinExamGroup(string examId)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"exam:{examId}");
-            _logger.LogInformation("User joined exam group: {ExamId}", examId);
-        }
-
-        public async Task LeaveExamGroup(string examId)
-        {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"exam:{examId}");
-            _logger.LogInformation("User left exam group: {ExamId}", examId);
-        }
-
         public async Task Typing(string receiverId)
         {
-            if (!int.TryParse(receiverId, out var receiverIntId)) return;
+            if (!int.TryParse(receiverId, out var rid) || !int.TryParse(Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var me)) return;
+            var a = await _unitOfWork.Repository<User>().GetByIdAsync(me);
+            var b = await _unitOfWork.Repository<User>().GetByIdAsync(rid);
+            if (a == null || b == null || !await ChatRules.CanChat(_unitOfWork, a, b)) return;
+            if (await IsLockedAsync(a, b)) return;
 
-            await Clients.Group($"user:{receiverIntId}").SendAsync("UserTyping",
-                Context.User?.FindFirst(ClaimTypes.Name)?.Value);
+            await Clients.Group($"user:{rid}").SendAsync("UserTyping", Context.User?.FindFirst(ClaimTypes.Name)?.Value);
         }
     }
 }

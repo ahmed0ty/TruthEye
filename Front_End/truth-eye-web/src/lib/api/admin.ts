@@ -1,6 +1,6 @@
 import { api } from "./client";
 import type {
-  Course, Department, Doctor, FacultyAdmin, Faculty, Proctor, Student, SupportMember,
+  Course, Department, Doctor, FacultyAdmin, Faculty, Paged, Proctor, Student, SupportMember,
   University, AiConfig, StaffMember, ActivityLogPage,
 } from "@/types/admin";
 import type { PersonRow } from "@/types/api";
@@ -32,6 +32,7 @@ export const adminApi = {
   aiConfigs: () => list<AiConfig>("/api/Admin/ai-config"),
   saveAiConfig: (d: { parameterName: string; value: string; threshold: number }) =>
     api("/api/Admin/ai-config", { method: "POST", body: d }),
+  
 
   // الأقسام
   departments: () => list<Department>("/api/Department"),
@@ -61,18 +62,24 @@ export const adminApi = {
 
   // الطلاب
   studentList: () => list<Student>("/api/Auth/students?includeDisabled=true"),
+  studentsPaged: (q: Record<string, string | number | undefined>) =>
+    api<Paged<Student>>("/api/Auth/students/paged", { query: q }),
   createStudent: (d: Record<string, unknown>) => api("/api/Auth/register/student", { method: "POST", body: d }),
   updateStudent: (id: number, d: Record<string, unknown>) => api(`/api/Auth/students/${id}`, { method: "PUT", body: d }),
   deleteStudent: (id: number) => api(`/api/Auth/students/${id}`, { method: "DELETE" }),
 
   // الدكاترة
   doctorList: () => list<Doctor>("/api/Auth/doctors?includeDisabled=true"),
+  doctorsPaged: (q: Record<string, string | number | undefined>) =>
+    api<Paged<Doctor>>("/api/Auth/doctors/paged", { query: q }),
   createDoctor: (d: Record<string, unknown>) => api("/api/Auth/register/doctor", { method: "POST", body: d }),
   updateDoctor: (id: number, d: Record<string, unknown>) => api(`/api/Auth/doctors/${id}`, { method: "PUT", body: d }),
   deleteDoctor: (id: number) => api(`/api/Auth/doctors/${id}`, { method: "DELETE" }),
 
   // المراقبون
   proctorList: () => list<Proctor>("/api/Auth/proctors?includeDisabled=true"),
+  proctorsPaged: (q: Record<string, string | number | undefined>) =>
+    api<Paged<Proctor>>("/api/Auth/proctors/paged", { query: q }),
   createProctor: (d: Record<string, unknown>) => api("/api/Auth/register/proctor", { method: "POST", body: d }),
   updateProctor: (id: number, d: Record<string, unknown>) => api(`/api/Auth/proctors/${id}`, { method: "PUT", body: d }),
   deleteProctor: (id: number) => api(`/api/Auth/proctors/${id}`, { method: "DELETE" }),
@@ -124,4 +131,9 @@ export const adminApi = {
     return api<ActivityLogPage>(`/api/ActivityLog?${p}`);
   },
   revertLog: (id: number) => api<string>(`/api/ActivityLog/${id}/revert`, { method: "POST" }),
+
+  // إعادة تعيين باسورد حساب (بترجّع باسورد مؤقت مرة واحدة)
+  resetPreview: (id: number) => api<{ email: string }>(`/api/Auth/users/${id}/reset-password/preview`),
+  resetPassword: (id: number) =>
+    api<{ sent: boolean; email: string }>(`/api/Auth/users/${id}/reset-password`, { method: "POST" }),
 };

@@ -4,13 +4,19 @@ namespace TruthEye.Services
 {
     public interface IAuthService
     {
-        Task<TokenPair> LoginAsync(LoginDto loginDto);
+        
+       Task<TokenPair> LoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null);
+       Task EndSessionAsync(string refreshToken);
+
         Task<TokenPair> RefreshAsync(string refreshToken);
         Task RevokeRefreshAsync(string refreshToken);
         Task<UserDto> GetUserByIdAsync(int userId);
         Task<AdminDto> RegisterSuperAdminAsync(RegisterUserDto registerDto);
         Task<AdminDto> RegisterFacultyAdminAsync(RegisterAdminDto registerDto, int actorId = 0);
         Task<bool> ChangePasswordAsync(int userId, ChangePasswordDto changePasswordDto);
+        Task<string> ResetPasswordAsync(int targetId, int actorId);
+        Task<string> PreviewResetEmailAsync(int targetId, int actorId);
+        Task ConfirmPasswordResetAsync(string token, string newPassword);
 
         // Students (Dean / Secretary / Technical)
         Task<StudentDto> RegisterStudentAsync(RegisterStudentDto registerDto, int adminId);
@@ -48,7 +54,7 @@ namespace TruthEye.Services
         Task<string> RevertMemberActionAsync(int logId, int actorId);
 
         // Support (SuperAdmin only)
-        Task<SupportDto> RegisterSupportAsync(RegisterSupportDto registerDto);
+        Task<SupportDto> RegisterSupportAsync(RegisterSupportDto registerDto, int actorId);
         Task<List<SupportDto>> GetAllSupportsAsync();
         Task<SupportDto> UpdateSupportAsync(int supportId, UpdateSupportDto updateDto);
         Task<bool> DeleteSupportAsync(int supportId);
@@ -58,7 +64,13 @@ namespace TruthEye.Services
         Task<AdminDto> UpdateAdminAsync(int adminId, UpdateAdminDto updateDto, int actorId = 0);
         Task<bool> DeleteAdminAsync(int adminId, int actorId = 0);
         Task<bool> SuperAdminExistsAsync();
+
+
+
+
+        Task<PagedResult<StudentDto>> GetFacultyStudentsPagedAsync(int adminId, PageQuery q);
+Task<PagedResult<DoctorDto>> GetFacultyDoctorsPagedAsync(int adminId, PageQuery q);
+Task<PagedResult<ProctorDto>> GetFacultyProctorsPagedAsync(int adminId, PageQuery q);
     }
 
-    public sealed record TokenPair(string AccessToken, string RefreshToken);
-}
+public sealed record TokenPair(string AccessToken, string RefreshToken, bool MustChangePassword = false);}

@@ -367,3 +367,14 @@ wwwroot/uploads/
 App_Data/
 appsettings.Production.json
 publish/
+
+# Student personal data
+**/students.xlsx
+*.xlsx
+
+# --- Secrets and local settings: never commit ---
+.env
+.env.*
+appsettings.Development.json
+TruthEye/appsettings.Development.json
+TruthEye/AI-BERT-Service/body.json

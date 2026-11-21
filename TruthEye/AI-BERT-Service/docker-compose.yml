@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   sbert-service:
     image: sentence-transformers-serving
@@ -6,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile.sbert
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
     restart: unless-stopped

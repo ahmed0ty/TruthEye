@@ -1,7 +1,7 @@
 import {
   BarChart3, BookOpen, Building2, ClipboardList, FileText, GraduationCap, History,
-  LayoutDashboard, LifeBuoy, MessageSquare, ScanEye, ScrollText, Settings, ShieldCheck,
-  Presentation, Ticket, UserCog, Users, type LucideIcon,
+  LayoutDashboard, LifeBuoy, MessageSquare, ScanEye, ScrollText, Settings, ShieldAlert, ShieldCheck,
+  Presentation, Scale, Ticket, UserCog, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/types/api";
 
@@ -12,6 +12,8 @@ export interface NavItem {
   soon?: boolean;
 }
 
+const reviewItem: NavItem = { label: "Session Review", href: "/admin/reviews", icon: ShieldAlert };
+
 const facultyCore: NavItem[] = [
   { label: "Home", href: "/admin", icon: LayoutDashboard },
   { label: "Students", href: "/admin/students", icon: Users },
@@ -19,6 +21,8 @@ const facultyCore: NavItem[] = [
   { label: "Proctors", href: "/admin/proctors", icon: ScanEye },
   { label: "Departments", href: "/admin/departments", icon: Building2 },
   { label: "Courses", href: "/admin/courses", icon: BookOpen },
+  { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+  reviewItem,
 ];
 const staffItem: NavItem = { label: "Staff", href: "/admin/staff", icon: UserCog };
 const logItem: NavItem = { label: "Activity Log", href: "/admin/activity", icon: ScrollText };
@@ -42,6 +46,8 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "Home", href: "/doctor", icon: LayoutDashboard },
     { label: "My Exams", href: "/doctor/exams", icon: ClipboardList },
     { label: "Results", href: "/doctor/results", icon: BarChart3 },
+    { label: "Appeals", href: "/doctor/appeals", icon: Scale },
+    { label: "Session Review", href: "/doctor/reviews", icon: ShieldAlert },
     { label: "Messages", href: "/chat", icon: MessageSquare },
     { label: "Support", href: "/doctor/support", icon: LifeBuoy },
   ],
@@ -50,6 +56,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "Available Exams", href: "/student/exams", icon: ClipboardList },
     { label: "My History", href: "/student/history", icon: History },
     { label: "Reports", href: "/student/reports", icon: FileText },
+    { label: "Appeals", href: "/student/appeals", icon: Scale },
     { label: "Messages", href: "/chat", icon: MessageSquare },
     { label: "Support", href: "/student/support", icon: LifeBuoy },
   ],
@@ -57,6 +64,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { label: "Home", href: "/proctor", icon: LayoutDashboard },
     { label: "Live Monitoring", href: "/proctor/live", icon: ScanEye },
     { label: "Alerts", href: "/proctor/alerts", icon: ShieldCheck },
+    { label: "Session Review", href: "/proctor/reviews", icon: ShieldAlert },
     { label: "Messages", href: "/chat", icon: MessageSquare },
   ],
   Support: [

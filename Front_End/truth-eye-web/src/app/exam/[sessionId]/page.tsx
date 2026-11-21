@@ -7,8 +7,16 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  AlertTriangle, ArrowRight, Camera, CheckCircle2, Clock, FileQuestion, Loader2,
-  ScanEye, ShieldAlert, WifiOff,
+  AlertTriangle,
+  ArrowRight,
+  Camera,
+  CheckCircle2,
+  Clock,
+  FileQuestion,
+  Loader2,
+  ScanEye,
+  ShieldAlert,
+  WifiOff,
 } from "lucide-react";
 import { ErrorState } from "@/components/ui/states";
 import { ExamLeftScreen } from "@/components/exam/exam-lock-ui";
@@ -33,7 +41,8 @@ function useCountdown(deadline: number | null) {
   const [left, setLeft] = useState<number | null>(null);
   useEffect(() => {
     if (deadline == null) return;
-    const tick = () => setLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    const tick = () =>
+      setLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     tick();
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
@@ -41,7 +50,11 @@ function useCountdown(deadline: number | null) {
   return left;
 }
 
-export default function ExamPage({ params }: { params: Promise<{ sessionId: string }> }) {
+export default function ExamPage({
+  params,
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
   const { sessionId: raw } = use(params);
   const sessionId = Number(raw);
   const router = useRouter();
@@ -61,7 +74,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [index, setIndex] = useState(0);
   const [locked, setLocked] = useState<Record<number, SavedAnswer>>({});
-  const [draft, setDraft] = useState<{ text: string; optionId: number | null }>({ text: "", optionId: null });
+  const [draft, setDraft] = useState<{ text: string; optionId: number | null }>(
+    { text: "", optionId: null },
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const initialised = useRef(false);
   const expiredHandled = useRef(false);
@@ -92,7 +107,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   // Deadline comes from the server's remaining time at load, not from the student's clock
   const deadline = useMemo(
     () => (data ? take.dataUpdatedAt + data.remainingSeconds * 1000 : null),
-    [data, take.dataUpdatedAt]
+    [data, take.dataUpdatedAt],
   );
   const left = useCountdown(deadline);
 
@@ -110,7 +125,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
       if (!cur || locked[cur.id]) return null;
       const hasOptions = (cur.options?.length ?? 0) > 0;
       if (hasOptions ? draft.optionId == null : !draft.text.trim()) return null;
-      return { questionId: cur.id, selectedOptionId: draft.optionId, answerText: draft.text };
+      return {
+        questionId: cur.id,
+        selectedOptionId: draft.optionId,
+        answerText: draft.text,
+      };
     },
     // leaving while the exam is being submitted is not a violation
     isSuspended: () => submit.isPending || submit.isSuccess,
@@ -131,8 +150,13 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
   const { violations, face, offline } = useProctoring({
     sessionId,
-    active: phase === "running" && !lock.terminated && !submit.isPending && !submit.isSuccess,
-    faceEnabled: !!stream && !lock.terminated && !submit.isPending && !submit.isSuccess,
+    active:
+      phase === "running" &&
+      !lock.terminated &&
+      !submit.isPending &&
+      !submit.isSuccess,
+    faceEnabled:
+      !!stream && !lock.terminated && !submit.isPending && !submit.isSuccess,
     videoRef,
   });
 
@@ -165,7 +189,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
 
-  const updateDraft = (patch: Partial<{ text: string; optionId: number | null }>) => {
+  const updateDraft = (
+    patch: Partial<{ text: string; optionId: number | null }>,
+  ) => {
     const next = { ...draft, ...patch };
     setDraft(next);
     if (currentId != null) {
@@ -197,7 +223,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const saveNext = useMutation({
     mutationFn: async () => {
       const q = questions[index];
-      const answer = { questionId: q.id, answerText: draft.text, selectedOptionId: draft.optionId };
+      const answer = {
+        questionId: q.id,
+        answerText: draft.text,
+        selectedOptionId: draft.optionId,
+      };
       const res = await examTakeApi.next(sessionId, q.id, answer);
       return { q, answer, res };
     },
@@ -238,9 +268,13 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     setStarting(true);
     let s: MediaStream | null = null;
     try {
-      s = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+      s = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 },
+        audio: false,
+      });
       const r = await lock.start(); // enters fullscreen and starts the lock
-      if (!r.ok) throw new Error(r.error ?? "Couldn't start the secure exam mode.");
+      if (!r.ok)
+        throw new Error(r.error ?? "Couldn't start the secure exam mode.");
       setStream(s);
       setPhase("running");
     } catch (e) {
@@ -250,10 +284,10 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
         name === "NotAllowedError"
           ? "Camera permission was denied. Allow it and try again."
           : name === "NotFoundError"
-          ? "No camera was found on this device."
-          : e instanceof Error && e.message
-          ? e.message
-          : "Couldn't start the secure exam mode. Try again."
+            ? "No camera was found on this device."
+            : e instanceof Error && e.message
+              ? e.message
+              : "Couldn't start the secure exam mode. Try again.",
       );
     } finally {
       setStarting(false);
@@ -265,6 +299,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F6F8FA] p-4">
         <ExamLeftScreen
+          sessionId={sessionId}
           reason={lock.terminated.reason}
           result={lock.terminated.result}
           failed={lock.terminated.failed}
@@ -286,8 +321,15 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F6F8FA] p-6">
         <div className="w-full max-w-lg space-y-5">
-          <ErrorState title="Can’t open this exam" message={(take.error as Error)?.message} onRetry={() => take.refetch()} />
-          <Link href="/student/exams" className="block text-center text-sm font-semibold text-teal-700 hover:text-teal-800">
+          <ErrorState
+            title="Can’t open this exam"
+            message={(take.error as Error)?.message}
+            onRetry={() => take.refetch()}
+          />
+          <Link
+            href="/student/exams"
+            className="block text-center text-sm font-semibold text-teal-700 hover:text-teal-800"
+          >
             Back to exams
           </Link>
         </div>
@@ -318,8 +360,12 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
               </span>
               <h1 className="mt-4 text-2xl font-bold">{data.examTitle}</h1>
               <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-300">
-                <span className="flex items-center gap-1.5"><FileQuestion size={16} /> {questions.length} questions</span>
-                <span className="flex items-center gap-1.5"><Clock size={16} /> {fmt(data.remainingSeconds)} remaining</span>
+                <span className="flex items-center gap-1.5">
+                  <FileQuestion size={16} /> {questions.length} questions
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock size={16} /> {fmt(data.remainingSeconds)} remaining
+                </span>
               </div>
             </div>
           </div>
@@ -327,32 +373,52 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
           <div className="space-y-6 p-8">
             {data.instructions && (
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Instructions</p>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Instructions
+                </p>
                 {data.instructions}
               </div>
             )}
 
             <ul className="grid gap-2.5 sm:grid-cols-2">
               {rules.map((r) => (
-                <li key={r} className="flex items-start gap-2 text-sm text-slate-600">
-                  <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-teal-600" /> {r}
+                <li
+                  key={r}
+                  className="flex items-start gap-2 text-sm text-slate-600"
+                >
+                  <CheckCircle2
+                    size={17}
+                    className="mt-0.5 shrink-0 text-teal-600"
+                  />{" "}
+                  {r}
                 </li>
               ))}
             </ul>
 
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-              <p>The timer already started when you pressed “Start exam”. Begin now to avoid losing time.</p>
+              <p>
+                The timer already started when you pressed “Start exam”. Begin
+                now to avoid losing time.
+              </p>
             </div>
 
-            {gateError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{gateError}</p>}
+            {gateError && (
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {gateError}
+              </p>
+            )}
 
             <button
               onClick={begin}
               disabled={starting}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3.5 font-semibold text-white shadow-lg shadow-teal-900/10 transition hover:bg-teal-700 active:scale-[0.98] disabled:opacity-60"
             >
-              {starting ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+              {starting ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Camera size={18} />
+              )}
               Enable camera & begin
             </button>
           </div>
@@ -374,11 +440,17 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
   const faceBadge = {
     off: null,
-    loading: { text: "Starting camera check...", cls: "bg-slate-800 text-slate-200" },
+    loading: {
+      text: "Starting camera check...",
+      cls: "bg-slate-800 text-slate-200",
+    },
     ok: { text: "Face detected", cls: "bg-emerald-600 text-white" },
     none: { text: "No face detected", cls: "bg-red-600 text-white" },
     multiple: { text: "Multiple faces", cls: "bg-red-600 text-white" },
-    unavailable: { text: "Face check unavailable", cls: "bg-amber-500 text-white" },
+    unavailable: {
+      text: "Face check unavailable",
+      cls: "bg-amber-500 text-white",
+    },
   }[face];
 
   return (
@@ -386,14 +458,20 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between gap-4 px-4">
           <div className="min-w-0">
-            <p className="truncate font-bold text-[#0A2540]">{data.examTitle}</p>
-            <p className="text-xs text-slate-500">{answered} of {total} answered</p>
+            <p className="truncate font-bold text-[#0A2540]">
+              {data.examTitle}
+            </p>
+            <p className="text-xs text-slate-500">
+              {answered} of {total} answered
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-                violations ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500"
+                violations
+                  ? "bg-red-50 text-red-600"
+                  : "bg-slate-100 text-slate-500",
               )}
               title="Recorded violations"
             >
@@ -402,7 +480,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
             <span
               className={cn(
                 "flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-lg font-bold tabular-nums",
-                lowTime ? "animate-pulse bg-red-600 text-white" : "bg-[#0A2540] text-teal-300"
+                lowTime
+                  ? "animate-pulse bg-red-600 text-white"
+                  : "bg-[#0A2540] text-teal-300",
               )}
             >
               <Clock size={18} /> {left == null ? "--:--" : fmt(left)}
@@ -410,7 +490,10 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
           </div>
         </div>
         <div className="h-1 bg-slate-100">
-          <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${total ? (answered / total) * 100 : 0}%` }} />
+          <div
+            className="h-full bg-teal-500 transition-all duration-500"
+            style={{ width: `${total ? (answered / total) * 100 : 0}%` }}
+          />
         </div>
       </header>
 
@@ -418,7 +501,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
         {offline && (
           <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <WifiOff size={18} className="mt-0.5 shrink-0" />
-            <p>You&apos;re offline. Your answers can&apos;t be saved until the connection returns. What you typed is kept on this device, and the timer keeps running.</p>
+            <p>
+              You&apos;re offline. Your answers can&apos;t be saved until the
+              connection returns. What you typed is kept on this device, and the
+              timer keeps running.
+            </p>
           </div>
         )}
 
@@ -429,7 +516,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
               key={x.id}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold",
-                locked[x.id] ? "bg-teal-600 text-white" : i === index ? "bg-[#0A2540] text-teal-300" : "bg-white text-slate-400 ring-1 ring-slate-200"
+                locked[x.id]
+                  ? "bg-teal-600 text-white"
+                  : i === index
+                    ? "bg-[#0A2540] text-teal-300"
+                    : "bg-white text-slate-400 ring-1 ring-slate-200",
               )}
             >
               {i + 1}
@@ -442,19 +533,28 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
               <CheckCircle2 size={32} />
             </div>
-            <h2 className="text-xl font-bold text-[#0A2540]">All questions answered</h2>
-            <p className="mt-1 text-sm text-slate-500">Submit your exam to see your result.</p>
+            <h2 className="text-xl font-bold text-[#0A2540]">
+              All questions answered
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Submit your exam to see your result.
+            </p>
             <button
               onClick={() => submit.mutate()}
               disabled={busy}
               className="mx-auto mt-6 flex items-center gap-2 rounded-xl bg-teal-600 px-8 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:opacity-60"
             >
-              {submit.isPending && <Loader2 size={18} className="animate-spin" />}
+              {submit.isPending && (
+                <Loader2 size={18} className="animate-spin" />
+              )}
               {submit.isPending ? "Grading..." : "Submit exam"}
             </button>
           </div>
         ) : (
-          <section key={q.id} className="animate-fade-up rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <section
+            key={q.id}
+            className="animate-fade-up rounded-3xl border border-slate-200 bg-white p-6 sm:p-8"
+          >
             <div className="mb-4 flex items-center justify-between">
               <span className="rounded-full bg-[#0A2540] px-3 py-1 text-xs font-bold text-teal-300">
                 Question {index + 1} / {total}
@@ -464,7 +564,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
               </span>
             </div>
 
-            <h2 className="whitespace-pre-wrap text-lg font-semibold leading-relaxed text-[#0A2540]">{q.questionText}</h2>
+            <h2 className="whitespace-pre-wrap text-lg font-semibold leading-relaxed text-[#0A2540]">
+              {q.questionText}
+            </h2>
 
             <div className="mt-6">
               {isMcq ? (
@@ -478,10 +580,19 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
                           onClick={() => updateDraft({ optionId: o.id })}
                           className={cn(
                             "flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3.5 text-start text-sm font-medium transition",
-                            on ? "border-teal-600 bg-teal-50 text-teal-900" : "border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50"
+                            on
+                              ? "border-teal-600 bg-teal-50 text-teal-900"
+                              : "border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50",
                           )}
                         >
-                          <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold", on ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500")}>
+                          <span
+                            className={cn(
+                              "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold",
+                              on
+                                ? "bg-teal-600 text-white"
+                                : "bg-slate-100 text-slate-500",
+                            )}
+                          >
                             {String.fromCharCode(65 + i)}
                           </span>
                           {o.optionText}
@@ -502,21 +613,33 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
             </div>
 
             <div className="mt-8 flex items-center justify-between gap-4">
-              <p className="text-xs text-slate-400">Answers can’t be changed after you continue.</p>
+              <p className="text-xs text-slate-400">
+                Answers can’t be changed after you continue.
+              </p>
               <button
                 onClick={() => saveNext.mutate()}
                 disabled={busy || offline}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-60",
-                  canSave ? "bg-teal-600 text-white shadow-lg shadow-teal-900/10 hover:bg-teal-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  canSave
+                    ? "bg-teal-600 text-white shadow-lg shadow-teal-900/10 hover:bg-teal-700"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                 )}
               >
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                {busy ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <ArrowRight size={16} />
+                )}
                 {submit.isPending
                   ? "Grading..."
                   : canSave
-                  ? isLast ? "Save & submit" : "Save & next"
-                  : isLast ? "Skip & submit" : "Skip"}
+                    ? isLast
+                      ? "Save & submit"
+                      : "Save & next"
+                    : isLast
+                      ? "Skip & submit"
+                      : "Skip"}
               </button>
             </div>
           </section>
@@ -525,8 +648,23 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
       {/* camera preview */}
       <div className="fixed bottom-4 end-4 z-30 w-28 overflow-hidden rounded-2xl border-2 border-white bg-slate-900 shadow-xl sm:w-44">
-        <video ref={videoRef} autoPlay muted playsInline className="aspect-[4/3] w-full -scale-x-100 object-cover" />
-        {faceBadge && <div className={cn("px-2 py-1 text-center text-[11px] font-semibold", faceBadge.cls)}>{faceBadge.text}</div>}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="aspect-[4/3] w-full -scale-x-100 object-cover"
+        />
+        {faceBadge && (
+          <div
+            className={cn(
+              "px-2 py-1 text-center text-[11px] font-semibold",
+              faceBadge.cls,
+            )}
+          >
+            {faceBadge.text}
+          </div>
+        )}
       </div>
     </div>
   );

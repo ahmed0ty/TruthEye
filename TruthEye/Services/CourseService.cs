@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using TruthEye.Exceptions;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
@@ -61,7 +62,7 @@ namespace TruthEye.Services
                     .GetByIdAsync(createCourseDto.DepartmentId, d => d.Faculty);
 
                 if (department == null || department.FacultyId != admin.FacultyId)
-                    throw new Exception("Department does not belong to your faculty");
+                    throw new ForbiddenException("Department does not belong to your faculty");
 
                 var course = _mapper.Map<Course>(createCourseDto);
                 course.CreatedBy = admin.Id;
@@ -80,10 +81,14 @@ namespace TruthEye.Services
 
                 return _mapper.Map<CourseDto>(createdCourse);
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating course by Admin {AdminId}", adminId);
-                throw new Exception($"Error creating course: {ex.Message}");
+                throw new BadRequestException($"Error creating course: {ex.Message}");
             }
         }
 
@@ -99,7 +104,7 @@ namespace TruthEye.Services
                     .GetByIdAsync(courseId, c => c.Department);
 
                 if (course == null || course.Department.FacultyId != admin.FacultyId)
-                    throw new Exception("Course not found or access denied");
+                    throw new NotFoundException("Course not found or access denied");
 
                 var oldDepartmentId = course.DepartmentId;
 
@@ -109,7 +114,7 @@ namespace TruthEye.Services
                         .GetByIdAsync(updateCourseDto.DepartmentId);
 
                     if (newDepartment == null || newDepartment.FacultyId != admin.FacultyId)
-                        throw new Exception("New department does not belong to your faculty");
+                        throw new ForbiddenException("New department does not belong to your faculty");
                 }
 
                 var before = CourseSnapshot(course);
@@ -132,10 +137,14 @@ namespace TruthEye.Services
 
                 return _mapper.Map<CourseDto>(course);
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating course {CourseId} by Admin {AdminId}", courseId, adminId);
-                throw new Exception($"Error updating course: {ex.Message}");
+                throw new BadRequestException($"Error updating course: {ex.Message}");
             }
         }
 
@@ -146,13 +155,13 @@ namespace TruthEye.Services
                 var admin = await GetAdminWithFaculty(adminId);
 
                 if (!StaffRules.CanDeleteMembers(StaffRules.RoleOf(admin)))
-                    throw new Exception("You don't have permission to delete courses");
+                    throw new ForbiddenException("You don't have permission to delete courses");
 
                 var course = await _unitOfWork.Repository<Course>()
                     .GetByIdAsync(courseId, c => c.Department);
 
                 if (course == null || course.Department.FacultyId != admin.FacultyId)
-                    throw new Exception("Course not found or access denied");
+                    throw new NotFoundException("Course not found or access denied");
 
                 _audit.Stage(Entry(admin, ActivityActions.Delete, ActivityEntities.Course, course.Id,
                     $"Deleted course {course.Name}", CourseSnapshot(course)));
@@ -166,10 +175,14 @@ namespace TruthEye.Services
 
                 return true;
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting course {CourseId} by Admin {AdminId}", courseId, adminId);
-                throw new Exception($"Error deleting course: {ex.Message}");
+                throw new BadRequestException($"Error deleting course: {ex.Message}");
             }
         }
 
@@ -186,7 +199,7 @@ namespace TruthEye.Services
                         c => c.RegisteredStudents);
 
                 if (course == null || course.Department.FacultyId != admin.FacultyId)
-                    throw new Exception("Course not found or access denied");
+                    throw new NotFoundException("Course not found or access denied");
 
                 return _mapper.Map<CourseDto>(course);
             }, _cacheExpiration);
@@ -227,7 +240,7 @@ namespace TruthEye.Services
                 var doctor = await GetDoctorWithPermissions(doctorId, admin.FacultyId);
 
                 if (course.Instructors.Any(d => d.Id == doctorId))
-                    throw new Exception("Doctor is already assigned to this course");
+                    throw new ConflictException("Doctor is already assigned to this course");
 
                 course.Instructors.Add(doctor);
 
@@ -245,10 +258,14 @@ namespace TruthEye.Services
 
                 return true;
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error assigning doctor {DoctorId} to course {CourseId}", doctorId, courseId);
-                throw new Exception($"Error assigning doctor to course: {ex.Message}");
+                throw new BadRequestException($"Error assigning doctor to course: {ex.Message}");
             }
         }
 
@@ -262,7 +279,7 @@ namespace TruthEye.Services
                 var doctor = await GetDoctorWithPermissions(doctorId, admin.FacultyId);
 
                 if (!course.Instructors.Any(d => d.Id == doctorId))
-                    throw new Exception("Doctor is not assigned to this course");
+                    throw new BadRequestException("Doctor is not assigned to this course");
 
                 course.Instructors.Remove(doctor);
 
@@ -278,10 +295,14 @@ namespace TruthEye.Services
 
                 return true;
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error removing doctor {DoctorId} from course {CourseId}", doctorId, courseId);
-                throw new Exception($"Error removing doctor from course: {ex.Message}");
+                throw new BadRequestException($"Error removing doctor from course: {ex.Message}");
             }
         }
 
@@ -310,7 +331,7 @@ namespace TruthEye.Services
                 var student = await GetStudentWithPermissions(studentId, admin.FacultyId);
 
                 if (course.RegisteredStudents.Any(s => s.Id == studentId))
-                    throw new Exception("Student is already registered in this course");
+                    throw new ConflictException("Student is already registered in this course");
 
                 course.RegisteredStudents.Add(student);
 
@@ -328,10 +349,14 @@ namespace TruthEye.Services
 
                 return true;
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error assigning student {StudentId} to course {CourseId}", studentId, courseId);
-                throw new Exception($"Error assigning student to course: {ex.Message}");
+                throw new BadRequestException($"Error assigning student to course: {ex.Message}");
             }
         }
 
@@ -345,7 +370,7 @@ namespace TruthEye.Services
                 var student = await GetStudentWithPermissions(studentId, admin.FacultyId);
 
                 if (!course.RegisteredStudents.Any(s => s.Id == studentId))
-                    throw new Exception("Student is not registered in this course");
+                    throw new BadRequestException("Student is not registered in this course");
 
                 course.RegisteredStudents.Remove(student);
 
@@ -361,10 +386,14 @@ namespace TruthEye.Services
 
                 return true;
             }
+            catch (AppException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error removing student {StudentId} from course {CourseId}", studentId, courseId);
-                throw new Exception($"Error removing student from course: {ex.Message}");
+                throw new BadRequestException($"Error removing student from course: {ex.Message}");
             }
         }
 
@@ -450,16 +479,16 @@ namespace TruthEye.Services
             var actor = await GetAdminWithFaculty(actorId);
 
             if (!StaffRules.CanDeleteMembers(StaffRules.RoleOf(actor)))
-                throw new Exception("Only the dean or the faculty secretary can undo actions");
+                throw new ForbiddenException("Only the dean or the faculty secretary can undo actions");
 
-            var log = await _audit.GetByIdAsync(logId) ?? throw new Exception("Log entry not found");
+            var log = await _audit.GetByIdAsync(logId) ?? throw new NotFoundException("Log entry not found");
 
             if (log.FacultyId != actor.FacultyId)
-                throw new Exception("Log entry not found or access denied");
+                throw new NotFoundException("Log entry not found or access denied");
             if (log.IsReverted)
-                throw new Exception("This action was already undone");
+                throw new ConflictException("This action was already undone");
             if (log.EntityId == null || !ActivityActions.IsReversible(log.EntityType, log.Action))
-                throw new Exception("This action can't be undone");
+                throw new BadRequestException("This action can't be undone");
 
             var summary = log.EntityType == ActivityEntities.Course
                 ? await RevertCourseAsync(log, actor)
@@ -479,17 +508,17 @@ namespace TruthEye.Services
             // _db.Courses مفيهوش فلتر الحذف، فبنقدر نوصل للمحذوفين
             var course = await _db.Courses.Include(c => c.Department)
                 .FirstOrDefaultAsync(c => c.Id == log.EntityId!.Value)
-                ?? throw new Exception("The course no longer exists");
+                ?? throw new NotFoundException("The course no longer exists");
 
             if (course.Department == null || course.Department.FacultyId != actor.FacultyId)
-                throw new Exception("Course not found or access denied");
+                throw new NotFoundException("Course not found or access denied");
 
             var now = DateTime.UtcNow;
             string summary;
 
             if (log.Action == ActivityActions.Delete)
             {
-                if (!course.IsDeleted) throw new Exception("The course is already restored");
+                if (!course.IsDeleted) throw new ConflictException("The course is already restored");
                 course.IsDeleted = false;
                 course.DeletedAt = null;
                 course.DeletedBy = null;
@@ -497,7 +526,7 @@ namespace TruthEye.Services
             }
             else // Create / Restore
             {
-                if (course.IsDeleted) throw new Exception("The course is already deleted");
+                if (course.IsDeleted) throw new ConflictException("The course is already deleted");
                 course.IsDeleted = true;
                 course.DeletedAt = now;
                 course.DeletedBy = actor.Id;
@@ -515,16 +544,16 @@ namespace TruthEye.Services
             var isStudent = log.EntityType == ActivityEntities.CourseStudent;
             var undoAssign = log.Action != ActivityActions.Unassign;
             var ids = ReadIds(undoAssign ? log.NewValues : log.OldValues);
-            if (ids.Count == 0) throw new Exception("No recorded members to restore");
+            if (ids.Count == 0) throw new NotFoundException("No recorded members to restore");
 
             var course = await _db.Courses.Include(c => c.Department)
                 .Include(c => c.RegisteredStudents).Include(c => c.Instructors)
                 .FirstOrDefaultAsync(c => c.Id == log.EntityId!.Value)
-                ?? throw new Exception("The course no longer exists");
+                ?? throw new NotFoundException("The course no longer exists");
 
-            if (course.IsDeleted) throw new Exception("The course is deleted. Restore it first");
+            if (course.IsDeleted) throw new BadRequestException("The course is deleted. Restore it first");
             if (course.Department == null || course.Department.FacultyId != actor.FacultyId)
-                throw new Exception("Course not found or access denied");
+                throw new NotFoundException("Course not found or access denied");
 
             var changed = 0;
 
@@ -585,7 +614,7 @@ namespace TruthEye.Services
         {
             var results = new List<ValidationResult>();
             if (!Validator.TryValidateObject(dto, new ValidationContext(dto), results, true))
-                throw new Exception($"Validation failed: {string.Join(", ", results.Select(v => v.ErrorMessage))}");
+                throw new BadRequestException($"Validation failed: {string.Join(", ", results.Select(v => v.ErrorMessage))}");
         }
 
         private async Task<Admin> GetAdminWithFaculty(int adminId)
@@ -594,10 +623,10 @@ namespace TruthEye.Services
                 .GetByIdAsync(adminId, a => a.Faculty);
 
             if (admin == null)
-                throw new Exception("Admin not found");
+                throw new NotFoundException("Admin not found");
 
             if (!admin.IsActive)
-                throw new Exception("Your account is disabled");
+                throw new ForbiddenException("Your account is disabled");
 
             return admin;
         }
@@ -611,7 +640,7 @@ namespace TruthEye.Services
                     c => c.RegisteredStudents);
 
             if (course == null || course.Department.FacultyId != facultyId)
-                throw new Exception("Course not found or access denied");
+                throw new NotFoundException("Course not found or access denied");
 
             return course;
         }
@@ -622,7 +651,7 @@ namespace TruthEye.Services
                 .GetByIdAsync(doctorId, d => d.Faculty);
 
             if (doctor == null || doctor.FacultyId != facultyId)
-                throw new Exception("Doctor not found or access denied");
+                throw new NotFoundException("Doctor not found or access denied");
 
             return doctor;
         }
@@ -633,7 +662,7 @@ namespace TruthEye.Services
                 .GetByIdAsync(studentId, s => s.Faculty);
 
             if (student == null || student.FacultyId != facultyId)
-                throw new Exception("Student not found or access denied");
+                throw new NotFoundException("Student not found or access denied");
 
             return student;
         }
