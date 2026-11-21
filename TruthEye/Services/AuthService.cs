@@ -27,6 +27,7 @@ namespace TruthEye.Services
         private readonly ISystemLogService _audit;
         private readonly IEmailSender _email;
         private readonly PasswordHasher<User> _passwordHasher = new();
+        private readonly TwoFactorCrypto _twoFactor;
 
         private const int MaxFailures = 5;              // لكل (حساب + IP)
         private const int MaxFailuresPerIp = 30;        // لكل IP على كل الحسابات
@@ -53,11 +54,12 @@ namespace TruthEye.Services
             _db = db;
             _audit = audit;
             _email = email;
+            _twoFactor = new TwoFactorCrypto(configuration["Jwt:Key"] ?? string.Empty);
         }
 
         #region Authentication Methods
 
-        public async Task<TokenPair> LoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null)
+        public async Task<LoginOutcome> BeginLoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null)
         {
             Validate(loginDto);
 
@@ -165,6 +167,22 @@ namespace TruthEye.Services
                 throw new ConflictException("This account is signed in on another device right now.", "AUTH_OTHER_DEVICE");
             }
 
+            // 2FA مفعّل: الباسورد اتقبل، بس التوكنات لسه ما اتصدرتش. الكود بيتطلب في الخطوة التانية
+            if (user.TwoFactorEnabled)
+                return new LoginOutcome(null, _twoFactor.IssueChallenge(user.Id));
+
+            var tokens = await OpenSessionAsync(user, account, ip, deviceId, now);
+            return new LoginOutcome(tokens, null);
+        }
+
+        public async Task<TokenPair> LoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null)
+        {
+            var outcome = await BeginLoginAsync(loginDto, ip, deviceId);
+            return outcome.Tokens ?? throw new BadRequestException("Two-factor code required", "AUTH_2FA_REQUIRED");
+        }
+
+        private async Task<TokenPair> OpenSessionAsync(User user, string account, string ip, string deviceId, DateTime now)
+        {
             // نفس الجهاز أو مفيش جلسة حية: نقفل القديم ونفتح جلسة جديدة
             var olds = await _db.UserSessions.Where(s => s.UserId == user.Id && s.EndedAt == null).ToListAsync();
             foreach (var s in olds) s.EndedAt = now;
@@ -186,6 +204,189 @@ namespace TruthEye.Services
             await LogLoginAsync(ActivityActions.LoginSuccess, user, account, ip, "Signed in");
 
             return new TokenPair(GenerateJwtToken(user, sid), await IssueRefreshAsync(user.Id, sid), user.MustChangePassword);
+        }
+
+        /// <summary>الخطوة التانية: الباسورد اتقبل قبل كده، والكود (TOTP أو كود استرجاع) بيتأكد هنا وبعدين بتتفتح الجلسة.</summary>
+        public async Task<TokenPair> CompleteTwoFactorLoginAsync(string challengeToken, string code, string? ip = null, string? deviceId = null)
+        {
+            var userId = _twoFactor.ReadChallenge(challengeToken);
+            if (userId == null)
+                throw new BadRequestException("The sign-in step expired. Please sign in again.", "AUTH_CHALLENGE_EXPIRED");
+
+            var user = await GetActiveUserAsync(userId.Value);
+            ip = string.IsNullOrWhiteSpace(ip) ? "unknown" : ip;
+            deviceId = string.IsNullOrWhiteSpace(deviceId) ? "none" : deviceId;
+            var account = (user.Email ?? string.Empty).Trim().ToLowerInvariant();
+            var now = DateTime.UtcNow;
+
+            // نفس عدّاد الباسورد: كود 2FA غلط كتير يقفل الحساب مؤقتاً
+            var key = $"2fa:{user.Id}";
+            var lockRow = await _db.LoginLockouts.FirstOrDefaultAsync(l => l.Key == key);
+            if (lockRow?.LockedUntil > now)
+            {
+                var mins = (int)Math.Ceiling((lockRow.LockedUntil!.Value - now).TotalMinutes);
+                throw new BadRequestException($"Too many failed attempts. Try again in {mins} minute(s).", "AUTH_LOCKED");
+            }
+
+            if (!ConsumeCode(user, code, now))
+            {
+                RegisterFailure(key, lockRow, MaxFailures, now);
+                await _db.SaveChangesAsync();
+                await LogLoginAsync(ActivityActions.LoginFailed, user, account, ip, "Wrong two-factor code");
+                throw new BadRequestException("Invalid verification code", "AUTH_INVALID_2FA_CODE");
+            }
+
+            if (lockRow != null) _db.LoginLockouts.Remove(lockRow);
+            await _db.SaveChangesAsync();   // يحفظ الـ step المستخدم أو كود الاسترجاع اللي اتصرف
+
+            // الجلسة الحية على جهاز تاني ممكن تكون اتفتحت وإحنا مستنيين الكود
+            var alive = now - SessionAlive;
+            var liveOthers = await _db.UserSessions.AsNoTracking()
+                .AnyAsync(s => s.UserId == user.Id && s.EndedAt == null && s.LastSeenAt > alive && s.DeviceId != deviceId);
+            if (liveOthers)
+                throw new ConflictException("This account is signed in on another device right now.", "AUTH_OTHER_DEVICE");
+
+            return await OpenSessionAsync(user, account, ip, deviceId, now);
+        }
+
+        // ---------- الإعداد والإلغاء ----------
+
+        public async Task<TwoFactorSetupDto> BeginTwoFactorSetupAsync(int userId)
+        {
+            var user = await GetActiveUserAsync(userId);
+            if (user.TwoFactorEnabled)
+                throw new BadRequestException("Two-factor sign-in is already on", "AUTH_2FA_ALREADY_ON");
+
+            var secret = TotpCodes.NewSecret();
+            user.TotpSecretProtected = _twoFactor.EncryptSecret(secret);
+            user.TotpLastStep = null;
+            await _unitOfWork.SaveChangesAsync();
+
+            var base32 = TotpCodes.ToBase32(secret);
+            return new TwoFactorSetupDto(base32, TotpCodes.OtpAuthUri(user.Email, base32));
+        }
+
+        public async Task<IReadOnlyList<string>> EnableTwoFactorAsync(int userId, string code)
+        {
+            var user = await GetActiveUserAsync(userId);
+            if (user.TwoFactorEnabled)
+                throw new BadRequestException("Two-factor sign-in is already on", "AUTH_2FA_ALREADY_ON");
+            if (user.TotpSecretProtected == null)
+                throw new BadRequestException("Start the two-factor setup first", "AUTH_2FA_NOT_STARTED");
+
+            var now = DateTime.UtcNow;
+            var step = TotpCodes.Match(_twoFactor.DecryptSecret(user.TotpSecretProtected),
+                TwoFactorCrypto.NormalizeCode(code), null, TotpCodes.StepAt(now));
+            if (step == null)
+                throw new BadRequestException("Invalid verification code", "AUTH_INVALID_2FA_CODE");
+
+            var codes = TwoFactorCrypto.NewRecoveryCodes();
+            user.TwoFactorEnabled = true;
+            user.TotpLastStep = step;
+            user.RecoveryCodeHashes = string.Join(',', codes.Select(TwoFactorCrypto.HashRecoveryCode));
+
+            await SaveWithAuditAsync(user, userId, StaffRules.RoleOf(user), ActivityActions.EnableTwoFactor, "Turned on two-factor sign-in for");
+            return codes;
+        }
+
+        public async Task DisableTwoFactorAsync(int userId, string password, string code)
+        {
+            var user = await GetActiveUserAsync(userId);
+            if (!user.TwoFactorEnabled)
+                throw new BadRequestException("Two-factor sign-in is not on", "AUTH_2FA_NOT_ON");
+            if (!VerifyPassword(password, user.PasswordHash))
+                throw new BadRequestException("Invalid credentials", "AUTH_INVALID_CREDENTIALS");
+            if (!ConsumeCode(user, code, DateTime.UtcNow))
+                throw new BadRequestException("Invalid verification code", "AUTH_INVALID_2FA_CODE");
+
+            ClearTwoFactor(user);
+            await SaveWithAuditAsync(user, userId, StaffRules.RoleOf(user), ActivityActions.DisableTwoFactor, "Turned off two-factor sign-in for");
+        }
+
+        public async Task<bool> IsTwoFactorEnabledAsync(int userId) =>
+            (await GetActiveUserAsync(userId)).TwoFactorEnabled;
+
+        /// <summary>رئيس الجامعة لأي حساب، والعميد لكليته بس. الأمين والتيم الفني والدعم ما يقدروش.</summary>
+        public async Task ResetTwoFactorAsync(int targetId, int actorId)
+        {
+            var actor = await GetActiveUserAsync(actorId);
+            var actorRole = StaffRules.RoleOf(actor);
+            if (actorRole is not (AppRoles.SuperAdmin or AppRoles.Dean))
+                throw new ForbiddenException();
+            if (targetId == actorId)
+                throw new BadRequestException("Use the disable option for your own account", "AUTH_2FA_SELF");
+
+            var target = await _unitOfWork.Repository<User>().GetByIdAsync(targetId)
+                ?? throw new NotFoundException("User not found");
+            if (actorRole == AppRoles.Dean && ChatRules.FacultyOf(target) != ChatRules.FacultyOf(actor))
+                throw new NotFoundException("User not found");   // خارج الكلية = "مش موجود"
+
+            ClearTwoFactor(target);
+            await SaveWithAuditAsync(target, actorId, actorRole, ActivityActions.ResetTwoFactor, "Reset two-factor sign-in for");
+        }
+
+        private async Task<User> GetActiveUserAsync(int userId)
+        {
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId)
+                ?? throw new NotFoundException("User not found");
+            if (user.IsDeleted || !user.IsActive)
+                throw new ForbiddenException("Account is disabled", "AUTH_DISABLED");
+            return user;
+        }
+
+        /// <summary>يتأكد من كود TOTP أو كود استرجاع، ويحدّث الحالة لو نجح. ما بيغيّرش حاجة لو فشل.</summary>
+        private bool ConsumeCode(User user, string? code, DateTime now)
+        {
+            if (user.TotpSecretProtected == null) return false;
+            var normalized = TwoFactorCrypto.NormalizeCode(code);
+            if (normalized.Length == TotpCodes.Digits)
+            {
+                var step = TotpCodes.Match(_twoFactor.DecryptSecret(user.TotpSecretProtected),
+                    normalized, user.TotpLastStep, TotpCodes.StepAt(now));
+                if (step == null) return false;
+                user.TotpLastStep = step;
+                return true;
+            }
+            return TakeRecoveryCode(user, normalized);
+        }
+
+        private static bool TakeRecoveryCode(User user, string normalized)
+        {
+            if (user.RecoveryCodeHashes == null || normalized.Length != 8) return false;
+            var hashes = user.RecoveryCodeHashes.Split(',').ToList();
+            if (!hashes.Remove(TwoFactorCrypto.HashRecoveryCode(normalized))) return false;
+            user.RecoveryCodeHashes = hashes.Count == 0 ? null : string.Join(',', hashes);
+            return true;
+        }
+
+        private static void ClearTwoFactor(User user)
+        {
+            user.TwoFactorEnabled = false;
+            user.TotpSecretProtected = null;
+            user.TotpLastStep = null;
+            user.RecoveryCodeHashes = null;
+        }
+
+        private async Task SaveWithAuditAsync(User target, int actorId, string actorRole, string action, string text)
+        {
+            var faculty = ChatRules.FacultyOf(target);
+            _audit.Stage(new AuditEntry
+            {
+                ActorId = actorId,
+                ActorRole = actorRole,
+                FacultyId = faculty > 0 ? faculty : null,
+                Action = action,
+                EntityType = StaffRules.RoleOf(target) switch
+                {
+                    AppRoles.Student => ActivityEntities.Student,
+                    AppRoles.Doctor => ActivityEntities.Doctor,
+                    AppRoles.Proctor => ActivityEntities.Proctor,
+                    _ => ActivityEntities.Staff
+                },
+                EntityId = target.Id,
+                Description = $"{text} {target.FirstName} {target.LastName}"
+            });
+            await _unitOfWork.SaveChangesAsync();
         }
 
         private void RegisterFailure(string key, LoginLockout? l, int max, DateTime now)

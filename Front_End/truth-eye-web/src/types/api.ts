@@ -18,6 +18,8 @@ export interface LoginResponse {
   token: string;
   refreshToken?: string;
   mustChangePassword?: boolean;
+  twoFactorRequired?: boolean;
+  twoFactorToken?: string;
 }
 
 export interface UserProfile {

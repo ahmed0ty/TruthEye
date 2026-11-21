@@ -5,7 +5,14 @@ namespace TruthEye.Services
     public interface IAuthService
     {
         
+       Task<LoginOutcome> BeginLoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null);
        Task<TokenPair> LoginAsync(LoginDto loginDto, string? ip = null, string? deviceId = null);
+       Task<TokenPair> CompleteTwoFactorLoginAsync(string challengeToken, string code, string? ip = null, string? deviceId = null);
+       Task<TwoFactorSetupDto> BeginTwoFactorSetupAsync(int userId);
+       Task<IReadOnlyList<string>> EnableTwoFactorAsync(int userId, string code);
+       Task DisableTwoFactorAsync(int userId, string password, string code);
+       Task<bool> IsTwoFactorEnabledAsync(int userId);
+       Task ResetTwoFactorAsync(int targetId, int actorId);
        Task EndSessionAsync(string refreshToken);
 
         Task<TokenPair> RefreshAsync(string refreshToken);
@@ -72,5 +79,7 @@ namespace TruthEye.Services
 Task<PagedResult<DoctorDto>> GetFacultyDoctorsPagedAsync(int adminId, PageQuery q);
 Task<PagedResult<ProctorDto>> GetFacultyProctorsPagedAsync(int adminId, PageQuery q);
     }
+
+public sealed record LoginOutcome(TokenPair? Tokens, string? TwoFactorToken);
 
 public sealed record TokenPair(string AccessToken, string RefreshToken, bool MustChangePassword = false);}
