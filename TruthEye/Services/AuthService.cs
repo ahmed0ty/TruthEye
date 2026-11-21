@@ -62,7 +62,7 @@ namespace TruthEye.Services
             Validate(loginDto);
 
             if (string.IsNullOrEmpty(loginDto.Email) && string.IsNullOrEmpty(loginDto.NationalId))
-                throw new BadRequestException("Either email or national ID must be provided");
+                throw new BadRequestException("Either email or national ID must be provided", "AUTH_INVALID_CREDENTIALS");
 
             var account = (string.IsNullOrWhiteSpace(loginDto.Email) ? loginDto.NationalId : loginDto.Email)!
                 .Trim().ToLowerInvariant();
@@ -86,7 +86,7 @@ namespace TruthEye.Services
             if (until > now)
             {
                 var mins = (int)Math.Ceiling((until - now).TotalMinutes);
-                throw new BadRequestException($"Too many failed attempts. Try again in {mins} minute(s).");
+                throw new BadRequestException($"Too many failed attempts. Try again in {mins} minute(s).", "AUTH_LOCKED");
             }
 
             User? user = null;
@@ -121,7 +121,7 @@ namespace TruthEye.Services
                 await LogLoginAsync(ActivityActions.LoginFailed, user, account, ip,
                     lockedNow ? "Failed login, account locked" : "Failed login");
 
-                throw new BadRequestException("Invalid credentials");
+                throw new BadRequestException("Invalid credentials", "AUTH_INVALID_CREDENTIALS");
             }
 
             // دخول ناجح: نصفّر عدّاد (حساب+IP) بس. عدّاد الـ IP العام بيفضل لحد ما ينتهي
@@ -135,7 +135,7 @@ namespace TruthEye.Services
             if (!user.IsActive)
             {
                 await LogLoginAsync(ActivityActions.LoginDisabled, user, account, ip, "Login attempt on a disabled account");
-                throw new ForbiddenException("Account is disabled");
+                throw new ForbiddenException("Account is disabled", "AUTH_DISABLED");
             }
 
             // جلسة حية من جهاز تاني؟ الدخول يترفض
@@ -162,7 +162,7 @@ namespace TruthEye.Services
 
                 await LogLoginAsync(ActivityActions.LoginBlocked, user, account, ip,
                     "Blocked: the account is already signed in on another device");
-                throw new ConflictException("This account is signed in on another device right now.");
+                throw new ConflictException("This account is signed in on another device right now.", "AUTH_OTHER_DEVICE");
             }
 
             // نفس الجهاز أو مفيش جلسة حية: نقفل القديم ونفتح جلسة جديدة
@@ -1040,7 +1040,7 @@ namespace TruthEye.Services
                 ?? throw new NotFoundException("User not found");
 
             if (!user.IsActive)
-                throw new ForbiddenException("Account is disabled");
+                throw new ForbiddenException("Account is disabled", "AUTH_DISABLED");
 
             if (!VerifyPassword(changePasswordDto.CurrentPassword, user.PasswordHash))
                 throw new BadRequestException("Current password is incorrect");

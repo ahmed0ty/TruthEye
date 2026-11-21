@@ -113,12 +113,12 @@ namespace TruthEye.Controllers
             {
                 // Lockout, disabled-account and other-device messages are written for the user
                 _logger.LogWarning("Login rejected for {Account}: {Message}", AccountTag(loginDto.Email ?? loginDto.NationalId), ex.Message);
-                return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message });
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message, ErrorCode = ex.Code });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Login failed unexpectedly for {Account}", AccountTag(loginDto.Email ?? loginDto.NationalId));
-                return Unauthorized(new ApiErrorResponse { Success = false, Error = "Login failed. Please try again." });
+                return Unauthorized(new ApiErrorResponse { Success = false, Error = "Login failed. Please try again.", ErrorCode = "AUTH_FAILED" });
             }
         }
 
