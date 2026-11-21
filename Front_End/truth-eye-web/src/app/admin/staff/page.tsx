@@ -6,13 +6,14 @@ import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Ban, CheckCircle2 } from "lucide-react";
+import { Ban, CheckCircle2, KeyRound } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { SelectField, SubmitButton, TextField } from "@/components/ui/form-fields";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
+import { ResetPasswordDialog, type ResetTarget } from "@/components/admin/reset-password-dialog";
 import { adminApi } from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth/store";
 import type { StaffMember } from "@/types/admin";
@@ -32,7 +33,6 @@ const createSchema = base.extend({
   role: z.string().min(1, "Select a role"),
   email: z.string().trim().email("Invalid email"),
   nationalId: z.string().regex(/^\d{14}$/, "Must be 14 digits"),
-  password: z.string().min(6, "At least 6 characters"),
 });
 
 function StaffForm({
@@ -64,7 +64,7 @@ function StaffForm({
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateStaff(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStaff(v),
+      editing ? adminApi.updateStaff(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStaff({ ...v, sendSetupLink: true }),
     onSuccess: () => {
       toast.success(editing ? "Staff member updated" : "Staff member appointed");
       qc.invalidateQueries({ queryKey: ["staff"] });
@@ -91,7 +91,7 @@ function StaffForm({
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <TextField label="Password" type="password" dir="ltr" error={err("password")} {...register("password")} />
+            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
         </>
       )}
@@ -106,7 +106,7 @@ function StaffForm({
 }
 
 export default function StaffPage() {
-const user = useAuth((s) => s.user);
+  const user = useAuth((s) => s.user);
   const role = user?.role;
   const canAppoint = role === "Admin" || role === "FacultySecretary";
 
@@ -122,6 +122,7 @@ const user = useAuth((s) => s.user);
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; editing: StaffMember | null }>({ open: false, editing: null });
   const [removeTarget, setRemoveTarget] = useState<StaffMember | null>(null);
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["staff"], queryFn: adminApi.staffList });
 
   const toggle = useMutation({
@@ -174,6 +175,14 @@ const user = useAuth((s) => s.user);
               >
                 {r.isActive ? <Ban size={16} /> : <CheckCircle2 size={16} />}
               </button>
+              <button
+                type="button"
+                onClick={() => setResetTarget({ id: r.id, name: `${r.firstName} ${r.lastName}` })}
+                title="Reset password"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                <KeyRound size={16} />
+              </button>
               <RowActions onEdit={() => setModal({ open: true, editing: r })} onDelete={() => setRemoveTarget(r)} />
             </div>
           ) : null
@@ -196,6 +205,8 @@ const user = useAuth((s) => s.user);
         onCancel={() => setRemoveTarget(null)}
         onConfirm={() => removeTarget && remove.mutate(removeTarget.id)}
       />
+
+      <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
     </div>
   );
 }

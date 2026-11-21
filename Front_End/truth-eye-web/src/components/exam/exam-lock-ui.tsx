@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Loader2, Lock, ShieldCheck } from "lucide-react";
 import { LEAVE_TEXT, type ExamLeaveResult, type LeaveReason } from "@/lib/exam-lock";
+import { ResumeRequest } from "@/components/exam/resume-request";
 
 /** Shown before the exam. The click on the button enters full screen and starts the lock. */
 export function ExamStartGate({
@@ -39,6 +40,7 @@ export function ExamStartGate({
           ends the exam immediately.</b>
         </li>
         <li>• Your saved answers (and the one on the screen) are graded, and you <b>can’t come back</b> to the exam.</li>
+        <li>• If you lose your internet connection, you can ask your doctor or proctor to let you continue (once).</li>
         <li>• Allow the camera <b>before</b> you press Start, and close other apps that may pop up.</li>
       </ul>
 
@@ -56,14 +58,15 @@ export function ExamStartGate({
   );
 }
 
-/** Shown after the student left. The exam is over and can't be opened again. */
-/** Shown after the student left. The exam is over and can't be opened again. */
+/** Shown after the student left. The exam is over; a resume is possible only after a lost connection and with approval. */
 export function ExamLeftScreen({
+  sessionId,
   reason,
   result,
   failed,
   onRetry,
 }: {
+  sessionId: number;
   reason: LeaveReason;
   result: ExamLeaveResult | null;
   failed?: boolean;
@@ -77,7 +80,7 @@ export function ExamLeftScreen({
       <h1 className="text-2xl font-bold text-[#0A2540]">Your exam has ended</h1>
       <p className="mt-2 text-sm text-slate-600">{LEAVE_TEXT[reason]}</p>
       <p className="mt-1 text-sm text-slate-500">
-        The exam was submitted automatically with the answers you had so far. You can’t open it again.
+        The exam was submitted automatically with the answers you had so far. You can’t reopen it on your own.
       </p>
 
       <div className="mt-6 rounded-xl bg-slate-50 p-5">
@@ -106,6 +109,11 @@ export function ExamLeftScreen({
             <Loader2 size={16} className="animate-spin" /> Saving your result...
           </p>
         )}
+      </div>
+
+      {/* بيخفي نفسه لو الاستئناف مش مسموح (إنهاء إرادي، أو مرة تانية، أو الوقت خلص) */}
+      <div className="mt-6 text-start">
+        <ResumeRequest sessionId={sessionId} />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

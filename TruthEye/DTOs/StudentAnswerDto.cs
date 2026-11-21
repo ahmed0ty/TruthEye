@@ -4,8 +4,9 @@ namespace TruthEye.DTOs
 {
     public class StudentAnswerDto
     {
-        [Required]
+        [Range(1, int.MaxValue)]
         public int QuestionId { get; set; }
+        [StringLength(5000)]
         public string AnswerText { get; set; }
         public int? SelectedOptionId { get; set; }
     }

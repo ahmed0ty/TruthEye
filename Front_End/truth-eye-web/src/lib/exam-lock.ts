@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api/client";
@@ -112,7 +112,8 @@ export function useExamLock(opts: {
     }
 
     try {
-      const token = tokenRef.current ?? (await ensureFreshToken());
+      // Always a fresh token: a stale one would make the terminate call fail and let the student re-enter the exam
+      const token = await ensureFreshToken();
       const res = await fetch(`${BASE_URL}/api/ExamGuard/${sessionId}/terminate`, {
         method: "POST",
         keepalive: true,

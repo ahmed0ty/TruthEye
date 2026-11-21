@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Text.Json;
+﻿using TruthEye.Swagger;
 
 namespace TruthEye.Middleware
 {
@@ -14,42 +13,42 @@ namespace TruthEye.Middleware
             _logger = logger;
         }
 
-        public async Task InvokeAsync(HttpContext context)
+        public async Task InvokeAsync(HttpContext ctx)
         {
             try
             {
-                await _next(context);
+                await _next(ctx);
+            }
+            catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+            {
+                // العميل قفل الاتصال، مش خطأ
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An unhandled exception occurred");
-                await HandleExceptionAsync(context, ex);
+                if (ctx.Response.HasStarted)
+                {
+                    _logger.LogError(ex, "Error after the response started: {Path}", ctx.Request.Path);
+                    throw;
+                }
+
+                var (status, message, code) = ApiErrors.Map(ex, exposePlainMessages: false);
+                ApiErrors.Log(_logger, ex, status, $"{ctx.Request.Method} {ctx.Request.Path}");
+
+                ctx.Response.Clear();
+                ctx.Response.StatusCode = status;
+                await ctx.Response.WriteAsJsonAsync(new ApiErrorResponse
+                {
+                    Success = false,
+                    Error = message,
+                    ErrorCode = code
+                });
             }
-        }
-
-        private static Task HandleExceptionAsync(HttpContext context, Exception exception)
-        {
-            context.Response.ContentType = "application/json";
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-
-            var response = new
-            {
-                context.Response.StatusCode,
-                Message = "Internal Server Error",
-                Detailed = exception.Message
-            };
-
-            var jsonResponse = JsonSerializer.Serialize(response);
-            return context.Response.WriteAsync(jsonResponse);
         }
     }
 
     public static class ExceptionHandlingMiddlewareExtensions
     {
-        public static IApplicationBuilder UseExceptionHandlingMiddleware(this IApplicationBuilder builder)
-        {
-            return builder.UseMiddleware<ExceptionHandlingMiddleware>();
-        }
+        public static IApplicationBuilder UseExceptionHandlingMiddleware(this IApplicationBuilder app) =>
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
     }
 }
-

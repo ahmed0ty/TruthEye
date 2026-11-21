@@ -7,6 +7,6 @@ namespace TruthEye.Services
         Task SendNotificationAsync(int userId, string message, string type);
         Task SendBulkNotificationAsync(string role, string message, string type);
         Task<IEnumerable<Notification>> GetUserNotificationsAsync(int userId);
-        Task MarkAsReadAsync(int notificationId);
+        Task MarkAsReadAsync(int notificationId, int userId);
     }
 }

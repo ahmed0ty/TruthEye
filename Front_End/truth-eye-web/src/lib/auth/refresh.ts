@@ -1,5 +1,5 @@
 import { decodeToken } from "./jwt";
-import { clearToken, getRefresh, getToken, saveTokens } from "./storage";
+import { clearToken, getToken, hasSession, saveTokens } from "./storage";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5210";
 let inflight: Promise<string | null> | null = null;
@@ -7,15 +7,14 @@ let inflight: Promise<string | null> | null = null;
 /** Returns a new access token, or null. Only wipes the session when the server says the refresh token is invalid. */
 export function refreshTokens(): Promise<string | null> {
   if (inflight) return inflight;
-  const rt = getRefresh();
-  if (!rt) return Promise.resolve(null);
+  if (!hasSession()) return Promise.resolve(null);
 
   inflight = (async () => {
     try {
       const res = await fetch(`${BASE_URL}/api/Auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: rt }),
+        credentials: "include",
+        headers: { "X-Requested-With": "fetch" },
       });
       if (!res.ok) {
         if (res.status === 400 || res.status === 401 || res.status === 403) clearToken();
@@ -24,7 +23,7 @@ export function refreshTokens(): Promise<string | null> {
       const body = await res.json();
       const d = body?.data ?? body;
       if (!d?.token) return null;
-      saveTokens(d.token, d.refreshToken);
+      saveTokens(d.token);
       return d.token as string;
     } catch {
       return null; // network problem: keep the session, try again later

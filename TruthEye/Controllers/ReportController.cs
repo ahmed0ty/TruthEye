@@ -1,9 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using TruthEye.Services;
+using TruthEye.Entities;
+using TruthEye.Entities.Data;
+using TruthEye.Middleware;
 using TruthEye.Security;
+using TruthEye.Services;
+using TruthEye.UnitOfWorkk;
+
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -12,22 +16,40 @@ namespace TruthEye.Controllers
     public class ReportController : ControllerBase
     {
         private readonly IReportService _reportService;
+        private readonly IUnitOfWork _uow;
         private readonly ILogger<ReportController> _logger;
 
-        public ReportController(IReportService reportService, ILogger<ReportController> logger)
+        public ReportController(IReportService reportService, IUnitOfWork uow, ILogger<ReportController> logger)
         {
             _reportService = reportService;
+            _uow = uow;
             _logger = logger;
         }
 
-        private int CurrentUserId() =>
-            int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        private int CurrentUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        private string Role => User.FindFirst(ClaimTypes.Role)?.Value ?? "";
 
-        // The student may only export reports that belong to them
-        private async Task<bool> StudentOwnsReport(int reportId)
+        private async Task<bool> CanAccess(int studentId, int examId)
         {
-            var mine = await _reportService.GetStudentReportsAsync(CurrentUserId());
-            return mine.Any(x => x.Id == reportId);
+            var me = CurrentUserId();
+
+            if (Role == "Student") return studentId == me;
+
+            if (Role == "Doctor")
+            {
+                var exam = await _uow.Repository<Exam>().GetByIdAsync(examId);
+                return exam != null && exam.DoctorId == me;
+            }
+
+            var staff = await _uow.Repository<Admin>().GetByIdAsync(me);
+            var student = await _uow.Repository<Student>().GetByIdAsync(studentId);
+            return staff is { IsActive: true } && student != null && student.FacultyId == staff.FacultyId;
+        }
+
+        private async Task<PerformanceReport?> AccessibleReport(int reportId)
+        {
+            var r = await _uow.Repository<PerformanceReport>().GetByIdAsync(reportId);
+            return r != null && await CanAccess(r.StudentId, r.ExamId) ? r : null;
         }
 
         [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
@@ -36,34 +58,22 @@ namespace TruthEye.Controllers
         {
             try
             {
-                // A student can only generate a report for themselves
-                if (User.IsInRole("Student"))
-                    studentId = CurrentUserId();
+                if (Role == "Student") studentId = CurrentUserId();
 
-                var report = await _reportService.GeneratePerformanceReportAsync(studentId, examId);
-                return Ok(report);
+                if (!await CanAccess(studentId, examId))
+                    return NotFound(new { Error = "Not found" });
+
+                return Ok(await _reportService.GeneratePerformanceReportAsync(studentId, examId));
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to generate report");
-                return BadRequest(new { Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GenerateReport)); }
         }
 
         [Authorize(Roles = "Student")]
         [HttpGet("student")]
         public async Task<IActionResult> GetStudentReports()
         {
-            try
-            {
-                var reports = await _reportService.GetStudentReportsAsync(CurrentUserId());
-                return Ok(reports);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve student reports");
-                return BadRequest(new { Error = ex.Message });
-            }
+            try { return Ok(await _reportService.GetStudentReportsAsync(CurrentUserId())); }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetStudentReports)); }
         }
 
         [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
@@ -72,17 +82,12 @@ namespace TruthEye.Controllers
         {
             try
             {
-                if (User.IsInRole("Student") && !await StudentOwnsReport(reportId))
-                    return Forbid();
+                if (await AccessibleReport(reportId) == null) return NotFound(new { Error = "Report not found" });
 
-                var pdfBytes = await _reportService.ExportReportToPdfAsync(reportId);
-                return File(pdfBytes, "application/pdf", $"report_{reportId}.pdf");
+                var bytes = await _reportService.ExportReportToPdfAsync(reportId);
+                return File(bytes, "application/pdf", $"report_{reportId}.pdf");
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to export report to PDF: {ReportId}", reportId);
-                return BadRequest(new { Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(ExportToPdf)); }
         }
 
         [Authorize(Roles = "Student,Doctor," + AppRoles.FacultyStaff)]
@@ -91,18 +96,13 @@ namespace TruthEye.Controllers
         {
             try
             {
-                if (User.IsInRole("Student") && !await StudentOwnsReport(reportId))
-                    return Forbid();
+                if (await AccessibleReport(reportId) == null) return NotFound(new { Error = "Report not found" });
 
-                var excelBytes = await _reportService.ExportReportToExcelAsync(reportId);
-                return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                var bytes = await _reportService.ExportReportToExcelAsync(reportId);
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     $"report_{reportId}.xlsx");
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to export report to Excel: {ReportId}", reportId);
-                return BadRequest(new { Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(ExportToExcel)); }
         }
     }
 }

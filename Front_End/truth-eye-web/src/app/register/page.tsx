@@ -19,7 +19,7 @@ const schema = z
     email: z.string().trim().email("Invalid email address"),
     nationalId: z.string().regex(/^\d{14}$/, "National ID must be 14 digits"),
     phoneNumber: z.string().trim().min(8, "Phone number is required"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(8, "At least 8 characters").regex(/[A-Za-z]/, "Must include a letter").regex(/\d/, "Must include a number"),
     confirm: z.string(),
   })
   .refine((d) => d.password === d.confirm, { path: ["confirm"], message: "Passwords do not match" });

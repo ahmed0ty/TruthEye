@@ -7,7 +7,7 @@ using TruthEye.Entities.Data;
 using TruthEye.Security;
 using TruthEye.Services;
 using TruthEye.UnitOfWorkk;
-
+using TruthEye.Middleware;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -31,14 +31,13 @@ namespace TruthEye.Controllers
         {
             try
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
                 var notifications = await _notificationService.GetUserNotificationsAsync(userId);
                 return Ok(notifications);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to retrieve notifications");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to retrieve notifications");
             }
         }
 
@@ -47,13 +46,17 @@ namespace TruthEye.Controllers
         {
             try
             {
-                await _notificationService.MarkAsReadAsync(notificationId);
+                var me = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                var n = await _unitOfWork.Repository<Notification>().GetByIdAsync(notificationId);
+                if (n == null || n.UserId != me)
+                    return NotFound(new { Error = "Notification not found" });
+
+                await _notificationService.MarkAsReadAsync(notificationId, me);
                 return Ok(new { Message = "Notification marked as read" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to mark notification as read: {NotificationId}", notificationId);
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to mark notification as read");
             }
         }
 
@@ -97,8 +100,7 @@ namespace TruthEye.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send notification");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to send notification");
             }
         }
     }

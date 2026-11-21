@@ -43,6 +43,12 @@ public DbSet<TechnicalStaff> TechnicalStaffMembers { get; set; }
         public DbSet<MCQOption> MCQOptions { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<LoginLockout> LoginLockouts { get; set; }
+        public DbSet<SessionReview> SessionReviews { get; set; }
+        public DbSet<Appeal> Appeals { get; set; }
+public DbSet<GradeAdjustment> GradeAdjustments { get; set; }
+public DbSet<UserSession> UserSessions { get; set; }
+public DbSet<ResumeRequest> ResumeRequests { get; set; }
+public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
         #endregion
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -68,6 +74,18 @@ modelBuilder.Entity<User>()
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.NationalId)
                 .IsUnique();
+            #endregion
+
+            #region Password Reset Tokens
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasIndex(t => t.TokenHash)
+                .IsUnique();
+
+            modelBuilder.Entity<PasswordResetToken>()
+                .HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
             #endregion
 
             #region Question Configuration
@@ -314,8 +332,15 @@ modelBuilder.Entity<User>()
             modelBuilder.Entity<SystemLog>()
     .HasIndex(l => new { l.FacultyId, l.Timestamp });
 
+            // One attempt per student per exam (AttemptNumber is always 1)
             modelBuilder.Entity<ExamSession>()
-                .HasIndex(es => new { es.StudentId, es.ExamId });
+                .HasIndex(es => new { es.StudentId, es.ExamId })
+                .IsUnique();
+
+            // One stored answer per question per session
+            modelBuilder.Entity<Answer>()
+                .HasIndex(a => new { a.ExamSessionId, a.QuestionId })
+                .IsUnique();
 
             modelBuilder.Entity<AILog>()
                 .HasIndex(ai => new { ai.ExamSessionId, ai.Timestamp });
@@ -326,6 +351,34 @@ modelBuilder.Entity<User>()
             modelBuilder.Entity<LoginLockout>()
                 .HasIndex(l => l.Key)
                 .IsUnique();
+            modelBuilder.Entity<SessionReview>(e =>
+{
+    e.HasIndex(r => r.ExamSessionId).IsUnique();
+    e.HasOne<ExamSession>().WithMany().HasForeignKey(r => r.ExamSessionId).OnDelete(DeleteBehavior.NoAction);
+});
+            modelBuilder.Entity<Appeal>(e =>
+{
+    e.HasIndex(a => a.ExamSessionId).IsUnique();   // تظلم واحد لكل جلسة
+    e.HasIndex(a => a.StudentId);
+    e.HasOne(a => a.ExamSession).WithMany().HasForeignKey(a => a.ExamSessionId).OnDelete(DeleteBehavior.NoAction);
+});
+
+modelBuilder.Entity<GradeAdjustment>(e =>
+{
+    e.HasIndex(g => g.ExamSessionId);
+    e.HasOne<Answer>().WithMany().HasForeignKey(g => g.AnswerId).OnDelete(DeleteBehavior.NoAction);
+});
+modelBuilder.Entity<UserSession>(e =>
+{
+    e.HasIndex(s => new { s.UserId, s.EndedAt });
+    e.HasIndex(s => s.Sid).IsUnique();
+});
+modelBuilder.Entity<ResumeRequest>(e =>
+{
+    e.HasIndex(r => r.ExamSessionId).IsUnique();    // طلب واحد لكل جلسة = مرة واحدة فقط
+    e.HasIndex(r => new { r.Status, r.CreatedAt });
+    e.HasOne<ExamSession>().WithMany().HasForeignKey(r => r.ExamSessionId).OnDelete(DeleteBehavior.NoAction);
+});
             #endregion
 
             #region Seed Data

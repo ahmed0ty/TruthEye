@@ -177,13 +177,58 @@ namespace TruthEye.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExamSessionId");
-
                     b.HasIndex("QuestionId");
 
                     b.HasIndex("SelectedOptionId");
 
+                    b.HasIndex("ExamSessionId", "QuestionId")
+                        .IsUnique();
+
                     b.ToTable("Answers");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.Appeal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ExamSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RespondedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Response")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamSessionId")
+                        .IsUnique();
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("Appeals");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.ChatMessage", b =>
@@ -411,6 +456,9 @@ namespace TruthEye.Migrations
                     b.Property<int?>("DoctorId")
                         .HasColumnType("int");
 
+                    b.Property<string>("EndReason")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("EndTime")
                         .HasColumnType("datetime2");
 
@@ -424,6 +472,9 @@ namespace TruthEye.Migrations
                         .HasColumnType("float");
 
                     b.Property<int?>("ProctorId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RiskScore")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("StartTime")
@@ -451,6 +502,9 @@ namespace TruthEye.Migrations
                     b.Property<double>("TotalScore")
                         .HasColumnType("float");
 
+                    b.Property<int>("ViolationCount")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AdminId");
@@ -465,7 +519,8 @@ namespace TruthEye.Migrations
 
                     b.HasIndex("SupportId");
 
-                    b.HasIndex("StudentId", "ExamId");
+                    b.HasIndex("StudentId", "ExamId")
+                        .IsUnique();
 
                     b.ToTable("ExamSessions");
                 });
@@ -490,6 +545,45 @@ namespace TruthEye.Migrations
                     b.HasIndex("UniversityId");
 
                     b.ToTable("Faculties");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.GradeAdjustment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AnswerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ChangedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExamSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("NewMarks")
+                        .HasColumnType("float");
+
+                    b.Property<double>("OldMarks")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnswerId");
+
+                    b.HasIndex("ExamSessionId");
+
+                    b.ToTable("GradeAdjustments");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.LoginLockout", b =>
@@ -577,6 +671,44 @@ namespace TruthEye.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RequestedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.PerformanceReport", b =>
@@ -750,6 +882,50 @@ namespace TruthEye.Migrations
                     b.ToTable("Reports");
                 });
 
+            modelBuilder.Entity("TruthEye.Entities.ResumeRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DecidedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExamSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamSessionId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("ResumeRequests");
+                });
+
             modelBuilder.Entity("TruthEye.Entities.Role", b =>
                 {
                     b.Property<int>("Id")
@@ -807,6 +983,41 @@ namespace TruthEye.Migrations
                             Id = 8,
                             Name = "TechnicalStaff"
                         });
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.SessionReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ExamSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ReviewedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RiskScore")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExamSessionId")
+                        .IsUnique();
+
+                    b.ToTable("SessionReviews");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.SupportTicket", b =>
@@ -1006,6 +1217,9 @@ namespace TruthEye.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
                     b.Property<string>("NationalId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -1051,6 +1265,47 @@ namespace TruthEye.Migrations
                     b.HasDiscriminator<string>("UserType").HasValue("User");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.UserSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Ip")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Sid")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sid")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "EndedAt");
+
+                    b.ToTable("UserSessions");
                 });
 
             modelBuilder.Entity("TruthEye.Entities.MCQQuestion", b =>
@@ -1385,6 +1640,17 @@ namespace TruthEye.Migrations
                     b.Navigation("SelectedOption");
                 });
 
+            modelBuilder.Entity("TruthEye.Entities.Appeal", b =>
+                {
+                    b.HasOne("TruthEye.Entities.ExamSession", "ExamSession")
+                        .WithMany()
+                        .HasForeignKey("ExamSessionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("ExamSession");
+                });
+
             modelBuilder.Entity("TruthEye.Entities.ChatMessage", b =>
                 {
                     b.HasOne("TruthEye.Entities.User", "Receiver")
@@ -1499,6 +1765,15 @@ namespace TruthEye.Migrations
                     b.Navigation("University");
                 });
 
+            modelBuilder.Entity("TruthEye.Entities.GradeAdjustment", b =>
+                {
+                    b.HasOne("TruthEye.Entities.Answer", null)
+                        .WithMany()
+                        .HasForeignKey("AnswerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TruthEye.Entities.MCQOption", b =>
                 {
                     b.HasOne("TruthEye.Entities.MCQQuestion", "Question")
@@ -1519,6 +1794,15 @@ namespace TruthEye.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("TruthEye.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TruthEye.Entities.PerformanceReport", b =>
@@ -1579,6 +1863,24 @@ namespace TruthEye.Migrations
                         .IsRequired();
 
                     b.Navigation("Exam");
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.ResumeRequest", b =>
+                {
+                    b.HasOne("TruthEye.Entities.ExamSession", null)
+                        .WithMany()
+                        .HasForeignKey("ExamSessionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TruthEye.Entities.SessionReview", b =>
+                {
+                    b.HasOne("TruthEye.Entities.ExamSession", null)
+                        .WithMany()
+                        .HasForeignKey("ExamSessionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TruthEye.Entities.SupportTicket", b =>

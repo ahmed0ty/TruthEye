@@ -1,4 +1,5 @@
-﻿using ClosedXML.Excel;
+﻿using TruthEye.Exceptions;
+using ClosedXML.Excel;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -23,9 +24,17 @@ namespace TruthEye.Services
                 .FindAsync(es => es.StudentId == studentId && es.ExamId == examId && es.Status != "InProgress")).ToList();
 
             if (!sessions.Any())
-                throw new Exception("No completed exam session found");
+                throw new BadRequestException("No completed exam session found");
 
             var latest = sessions.OrderByDescending(s => s.StartTime).First();
+
+            // Reuse the existing report when it was generated after the latest attempt ended (no duplicate rows)
+            var latestEnd = latest.EndTime ?? latest.StartTime;
+            var existing = (await _unitOfWork.Repository<PerformanceReport>()
+                .FindAsync(r => r.StudentId == studentId && r.ExamId == examId)).ToList();
+            var current = existing.OrderByDescending(r => r.GeneratedAt).FirstOrDefault();
+            if (current != null && current.GeneratedAt >= latestEnd)
+                return current;
 
             var aiLogs = await _unitOfWork.Repository<AILog>()
                 .FindAsync(log => log.ExamSessionId == latest.Id);
@@ -55,7 +64,7 @@ namespace TruthEye.Services
         {
             var r = await _unitOfWork.Repository<PerformanceReport>()
                 .GetByIdAsync(reportId, x => x.Exam, x => x.Student);
-            if (r == null) throw new Exception("Report not found");
+            if (r == null) throw new NotFoundException("Report not found");
             return (r, r.Exam?.Title ?? $"Exam #{r.ExamId}",
                 r.Student != null ? $"{r.Student.FirstName} {r.Student.LastName}" : $"Student #{r.StudentId}");
         }
@@ -81,6 +90,10 @@ namespace TruthEye.Services
             })).GeneratePdf();
         }
 
+        // Excel treats a leading = + - @ as a formula when opened; neutralise such values
+        private static object SafeCell(object v) =>
+            v is string s && s.Length > 0 && "=+-@".IndexOf(s[0]) >= 0 ? "'" + s : v;
+
         public async Task<byte[]> ExportReportToExcelAsync(int reportId)
         {
             var (r, exam, student) = await Load(reportId);
@@ -100,7 +113,7 @@ namespace TruthEye.Services
             {
                 ws.Cell(i + 1, 1).Value = rows[i].Item1;
                 ws.Cell(i + 1, 1).Style.Font.Bold = true;
-                ws.Cell(i + 1, 2).Value = XLCellValue.FromObject(rows[i].Item2);
+                ws.Cell(i + 1, 2).Value = XLCellValue.FromObject(SafeCell(rows[i].Item2));
             }
             ws.Columns().AdjustToContents();
 

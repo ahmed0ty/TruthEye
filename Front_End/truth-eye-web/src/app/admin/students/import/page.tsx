@@ -18,7 +18,6 @@ const FIELDS: Record<string, string[]> = {
   email: ["email", "mail"],
   nationalId: ["nationalid", "nid"],
   phoneNumber: ["phonenumber", "phone", "mobile"],
-  password: ["password", "pass"],
   department: ["department", "dept"],
   year: ["year", "level"],
 };
@@ -30,23 +29,16 @@ const schema = z.object({
   email: z.string().trim().email("invalid email"),
   nationalId: z.string().regex(/^\d{14}$/, "national ID must be 14 digits (format the column as Text in Excel)"),
   phoneNumber: z.string().trim().min(8, "phone is too short"),
-  password: z.string().min(6, "password needs 6+ characters"),
 });
 
 const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-function genPassword() {
-  const b = new Uint32Array(10);
-  crypto.getRandomValues(b);
-  return Array.from(b, (n) => ALPHA[n % ALPHA.length]).join("") + "!";
-}
-
 interface Payload {
+  sendSetupLink?: boolean;
   firstName: string;
   lastName: string;
   email: string;
   nationalId: string;
   phoneNumber: string;
-  password: string;
   departmentId: number;
   year: number;
 }
@@ -57,13 +49,12 @@ interface Row {
   nationalId: string;
   department: string;
   year: string;
-  generated: boolean;
   payload?: Payload;
   errors: string[];
 }
 type Result = { ok: boolean; error?: string };
 
-const TEMPLATE_HEADERS = ["firstName", "lastName", "email", "nationalId", "phoneNumber", "password", "department", "year"];
+const TEMPLATE_HEADERS = ["firstName", "lastName", "email", "nationalId", "phoneNumber", "department", "year"];
 
 export default function ImportStudentsPage() {
   const qc = useQueryClient();
@@ -98,15 +89,12 @@ export default function ImportStudentsPage() {
       const get = (f: string) => (idx[f] >= 0 ? clean(cells[idx[f]]) : "");
       const errors: string[] = [];
 
-      const passwordGiven = get("password");
-      const password = passwordGiven || genPassword();
       const data = {
         firstName: get("firstName"),
         lastName: get("lastName"),
         email: get("email"),
         nationalId: get("nationalId"),
         phoneNumber: get("phoneNumber"),
-        password,
       };
 
       const check = schema.safeParse(data);
@@ -131,9 +119,8 @@ export default function ImportStudentsPage() {
         nationalId: data.nationalId,
         department: get("department"),
         year: get("year"),
-        generated: !passwordGiven,
         errors,
-        payload: errors.length ? undefined : { ...data, departmentId: departmentId!, year },
+        payload: errors.length ? undefined : { ...data, departmentId: departmentId!, year, sendSetupLink: true },
       };
     });
 
@@ -184,14 +171,13 @@ export default function ImportStudentsPage() {
   const downloadReport = () =>
     downloadCsv(
       "students_import_report.csv",
-      ["Line", "Name", "Email", "National ID", "Status", "Error", "Generated password"],
+      ["Line", "Name", "Email", "National ID", "Status", "Error"],
       rows.map((r) => {
         const res = results[r.line];
         const status = r.errors.length ? "Invalid" : res?.ok ? "Created" : res ? "Failed" : "Skipped";
         return [
           r.line, r.name, r.email, r.nationalId, status,
           r.errors.join("; ") || res?.error || "",
-          res?.ok && r.generated ? r.payload!.password : "",
         ];
       })
     );
@@ -233,7 +219,7 @@ export default function ImportStudentsPage() {
           </div>
           <p className="font-bold text-[#0A2540]">Choose a CSV file</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-            Columns: firstName, lastName, email, nationalId, phoneNumber, department, year, and an optional password. If the password is empty, a random one is generated.
+            Columns: firstName, lastName, email, nationalId, phoneNumber, department, year. Each student receives an email link to set their own password.
           </p>
           <input ref={input} type="file" accept=".csv,text/csv" className="hidden" onChange={onPick} />
           <button
@@ -297,12 +283,6 @@ export default function ImportStudentsPage() {
                 <div className="h-full rounded-full bg-teal-500 transition-all" style={{ width: `${valid.length ? (done / valid.length) * 100 : 0}%` }} />
               </div>
             </div>
-          )}
-
-          {phase === "done" && okCount > 0 && rows.some((r) => r.generated && results[r.line]?.ok) && (
-            <p className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Some passwords were generated. Download the report now and share them securely. They aren’t shown again.
-            </p>
           )}
 
           <div className="max-h-[28rem] overflow-auto">

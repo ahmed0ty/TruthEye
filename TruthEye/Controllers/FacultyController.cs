@@ -6,6 +6,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using System.Linq.Expressions;
 using TruthEye.DTOs;
 using TruthEye.Entities;
+using TruthEye.Security;
 using TruthEye.Swagger;
 using TruthEye.UnitOfWorkk;
 
@@ -13,7 +14,7 @@ namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-   // [Authorize]
+    [Authorize]
     public class FacultyController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
@@ -117,6 +118,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Create new faculty",
             Description = "Creates a new faculty for a university",
@@ -198,6 +200,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Update faculty",
             Description = "Updates an existing faculty's information",
@@ -294,6 +297,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Delete faculty",
             Description = "Soft deletes a faculty",
@@ -364,18 +368,11 @@ namespace TruthEye.Controllers
         {
             try
             {
-                Expression<Func<Faculty, bool>> filter = f => true;
+                var term = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm;
 
-                if (!string.IsNullOrEmpty(searchTerm))
-                {
-                    filter = f => f.Name.Contains(searchTerm);
-                }
-
-                if (universityId.HasValue)
-                {
-                    var originalFilter = filter;
-                    filter = f => originalFilter.Compile()(f) && f.UniversityId == universityId.Value;
-                }
+                Expression<Func<Faculty, bool>> filter = f =>
+                    (term == null || f.Name.Contains(term))
+                    && (universityId == null || f.UniversityId == universityId);
 
                 Expression<Func<Faculty, object>>[] includes =
                 {
@@ -400,7 +397,6 @@ namespace TruthEye.Controllers
             }
         }
 
-      
         #region Private Methods
 
         private Dictionary<string, string[]> GetModelStateErrors()

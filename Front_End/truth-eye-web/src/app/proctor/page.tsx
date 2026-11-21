@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Radio, ShieldAlert, Sparkles, Users } from "lucide-react";
 import { ChartCard, ChartEmpty, HBarChart } from "@/components/charts/charts";
+import { ResumeInbox } from "@/components/review/resume-inbox";
 import { proctorApi } from "@/lib/api/proctor";
 import { useAuth } from "@/lib/auth/store";
 import { fmtDateTime } from "@/lib/format";
@@ -48,6 +49,8 @@ export default function ProctorHome() {
 
   return (
     <div className="space-y-8">
+      <ResumeInbox />
+
       <section className="animate-fade-up relative overflow-hidden rounded-3xl bg-[#0A2540] p-8 text-white sm:p-10">
         <div
           aria-hidden

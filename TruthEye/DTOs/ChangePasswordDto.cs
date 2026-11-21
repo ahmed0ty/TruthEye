@@ -8,7 +8,7 @@ namespace TruthEye.DTOs
         public string CurrentPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "New password is required")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "New password must be at least 6 characters")]
+        [StringLength(128, MinimumLength = 8, ErrorMessage = "New password must be 8 to 128 characters")]
         public string NewPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Confirm new password is required")]

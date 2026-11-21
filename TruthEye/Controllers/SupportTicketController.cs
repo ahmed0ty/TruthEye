@@ -1,9 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using TruthEye.Middleware;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using TruthEye.DTOs;
-using TruthEye.Services;
+using TruthEye.Entities;
+using TruthEye.Entities.Data;
 using TruthEye.Security;
+using TruthEye.Services;
+using TruthEye.UnitOfWorkk;
+
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -12,11 +17,13 @@ namespace TruthEye.Controllers
     public class SupportTicketController : ControllerBase
     {
         private readonly ISupportTicketService _ticketService;
+        private readonly IUnitOfWork _uow;
         private readonly ILogger<SupportTicketController> _logger;
 
-        public SupportTicketController(ISupportTicketService ticketService, ILogger<SupportTicketController> logger)
+        public SupportTicketController(ISupportTicketService ticketService, IUnitOfWork uow, ILogger<SupportTicketController> logger)
         {
             _ticketService = ticketService;
+            _uow = uow;
             _logger = logger;
         }
 
@@ -34,7 +41,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to create support ticket");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "CreateTicket");
             }
         }
 
@@ -50,7 +57,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve user tickets");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetMyTickets");
             }
         }
 
@@ -67,27 +74,35 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve assigned tickets");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetAssignedTickets");
             }
         }
 
         [Authorize(Roles = "Support," + AppRoles.FacultyStaff)]
         [HttpGet]
-        public async Task<IActionResult> GetAllTickets([FromQuery] string status = null)
+        public async Task<IActionResult> GetAllTickets([FromQuery] string? status = null)
         {
             try
             {
-                var tickets = await _ticketService.GetAllTicketsAsync(status);
-                return Ok(tickets);
+                int? facultyId = null;
+                if (!User.IsInRole("Support"))
+                {
+                    var me = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+                    var staff = await _uow.Repository<Admin>().GetByIdAsync(me);
+                    if (staff is not { IsActive: true }) return Forbid();
+                    facultyId = staff.FacultyId;
+                }
+
+                return Ok(await _ticketService.GetAllTicketsAsync(status, facultyId));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve all tickets");
-                return BadRequest(new { Error = ex.Message });
+                return BadRequest(new { Error = "Couldn't load tickets" });
             }
         }
 
-        [Authorize(Roles = "Support," + AppRoles.FacultyStaff)]
+        [Authorize(Roles = "Support")]
         [HttpPut("{ticketId}/assign/{supportId}")]
         public async Task<IActionResult> AssignTicket(int ticketId, int supportId)
         {
@@ -100,7 +115,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to assign ticket");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "AssignTicket");
             }
         }
 
@@ -117,9 +132,8 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update ticket");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "UpdateTicket");
             }
         }
-       
     }
 }

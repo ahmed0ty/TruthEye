@@ -16,7 +16,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
-  refreshToken: string;
+  refreshToken?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface UserProfile {
@@ -31,6 +32,7 @@ export interface UserProfile {
   userType?: string | null;
   isActive: boolean;
   lastLogin?: string | null;
+  mustChangePassword?: boolean;
 }
 
 export interface SessionUser {
@@ -57,7 +59,8 @@ export interface RegisterSuperAdminRequest {
   email: string;
   nationalId: string;
   phoneNumber: string;
-  password: string;
+  password?: string;
+  sendSetupLink?: boolean;
 }
 
 export interface PersonRow {

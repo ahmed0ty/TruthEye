@@ -1,4 +1,4 @@
-import { authHeaders } from "@/lib/auth/refresh";
+﻿import { authHeaders } from "@/lib/auth/refresh";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5210";
 
@@ -21,7 +21,14 @@ export async function downloadFile(path: string, fallbackName: string) {
 
   const cd = res.headers.get("content-disposition") ?? "";
   const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
-  const name = match ? decodeURIComponent(match[1]) : fallbackName;
+  let name = fallbackName;
+  if (match) {
+    try {
+      name = decodeURIComponent(match[1]);
+    } catch {
+      // malformed filename from the server: keep the fallback
+    }
+  }
 
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");

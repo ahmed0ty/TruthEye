@@ -1,11 +1,15 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using TruthEye.Middleware;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
 using TruthEye.Entities;
+using TruthEye.Entities.Data;
 using TruthEye.Security;
 using TruthEye.Services;
+using TruthEye.UnitOfWorkk;
+
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -14,11 +18,13 @@ namespace TruthEye.Controllers
     public class ExamController : ControllerBase
     {
         private readonly IExamService _examService;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ExamController> _logger;
 
-        public ExamController(IExamService examService, ILogger<ExamController> logger)
+        public ExamController(IExamService examService, IUnitOfWork unitOfWork, ILogger<ExamController> logger)
         {
             _examService = examService;
+            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
@@ -41,7 +47,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve available exams");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetAvailableExams");
             }
         }
 
@@ -60,7 +66,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to create exam");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "CreateExam");
             }
         }
 
@@ -69,13 +75,16 @@ namespace TruthEye.Controllers
         {
             try
             {
+                if (!await CanSeeExamAsync(id))
+                    return StatusCode(403, new { Success = false, Error = "Access denied" });
+
                 var exam = await _examService.GetExamByIdAsync(id);
                 return Ok(new { Success = true, Data = exam });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam: {ExamId}", id);
-                return NotFound(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamById");
             }
         }
 
@@ -93,7 +102,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update exam: {ExamId}", id);
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "UpdateExam");
             }
         }
 
@@ -109,7 +118,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to change exam status");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "SetStatus");
             }
         }
 
@@ -127,7 +136,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to delete exam: {ExamId}", id);
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "DeleteExam");
             }
         }
 
@@ -137,13 +146,16 @@ namespace TruthEye.Controllers
         {
             try
             {
+              if (!await CanSeeExamAsync(id))
+    return StatusCode(403, new { Success = false, Error = "Access denied" });
+
                 var questions = await _examService.GetExamQuestionsAsync(id);
                 return Ok(new { Success = true, Data = questions });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam questions: {ExamId}", id);
-                return NotFound(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamQuestions");
             }
         }
 
@@ -161,7 +173,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to add question");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "AddQuestion");
             }
         }
 
@@ -180,7 +192,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to delete question: {QuestionId}", questionId);
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "DeleteQuestion");
             }
         }
 
@@ -196,7 +208,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get exam results");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamResults");
             }
         }
 
@@ -212,7 +224,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get exam analysis");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamAnalysis");
             }
         }
 
@@ -228,9 +240,41 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get student exam details");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetStudentExamDetails");
             }
         }
+
+       private async Task<bool> CanSeeExamAsync(int examId)
+{
+    var exam = await _unitOfWork.Repository<Exam>()
+        .GetByIdAsync(examId, e => e.Course, e => e.Course.Department);
+    if (exam == null || exam.Course?.Department == null) return false;
+
+    var me = GetCurrentUserId();
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+    var facultyId = exam.Course.Department.FacultyId;
+
+    switch (role)
+    {
+        case "Doctor":
+            if (exam.DoctorId == me) return true;
+            return await _unitOfWork.Repository<Course>()
+                .CountAsync(c => c.Id == exam.CourseId && c.Instructors.Any(d => d.Id == me)) > 0;
+
+        case "Student":
+            if (exam.Status == "Draft") return false;
+            return await _unitOfWork.Repository<Course>()
+                .CountAsync(c => c.Id == exam.CourseId && c.RegisteredStudents.Any(s => s.Id == me)) > 0;
+
+        case "Proctor":
+            var p = await _unitOfWork.Repository<Proctor>().GetByIdAsync(me);
+            return p is { IsActive: true } && p.FacultyId == facultyId;
+
+        default: // عميد / أمين / تيم فني
+            var staff = await _unitOfWork.Repository<Admin>().GetByIdAsync(me);
+            return staff is { IsActive: true } && staff.FacultyId == facultyId;
+    }
+}
 
         private int GetCurrentUserId()
         {

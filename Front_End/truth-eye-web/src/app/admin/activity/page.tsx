@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Undo2 } from "lucide-react";
+import { ChevronDown, Undo2 } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { PageHeader } from "@/components/ui/page-header";
+import { ChangeDetails } from "@/components/admin/change-details";
 import { adminApi } from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth/store";
 import type { ActivityLogItem } from "@/types/admin";
 
-const ENTITIES = ["Student", "Doctor", "Proctor", "Staff", "Course", "CourseStudent", "CourseDoctor", "Department"];
-const ACTIONS = ["Create", "Update", "Disable", "Enable", "Delete", "Assign", "Unassign", "BulkAssign", "Revert"];
+const ENTITIES = ["Student", "Doctor", "Proctor", "Staff", "Course", "CourseStudent", "CourseDoctor", "Department", "Login", "SessionReview", "Grade", "Appeal", "Resume"];
+const ACTIONS = ["Create", "Update", "Disable", "Enable", "Delete", "Assign", "Unassign", "BulkAssign", "Revert", "LoginSuccess", "LoginFailed", "LoginDisabled", "ReviewCleared", "ReviewConfirmed", "GradeAdjusted", "AppealCreated", "AppealAccepted", "AppealRejected", "ResumeRequested", "ResumeApproved", "ResumeRejected"];
 
 const TONE: Record<string, string> = {
   Create: "bg-emerald-50 text-emerald-700",
@@ -21,16 +22,29 @@ const TONE: Record<string, string> = {
   Enable: "bg-emerald-50 text-emerald-700",
   Delete: "bg-red-50 text-red-700",
   Revert: "bg-purple-50 text-purple-700",
+  LoginSuccess: "bg-emerald-50 text-emerald-700",
+  LoginFailed: "bg-red-50 text-red-700",
+  LoginDisabled: "bg-amber-50 text-amber-700",
+  ReviewConfirmed: "bg-red-50 text-red-700",
+  ReviewCleared: "bg-emerald-50 text-emerald-700",
+  GradeAdjusted: "bg-purple-50 text-purple-700",
+  AppealCreated: "bg-amber-50 text-amber-700",
+  AppealAccepted: "bg-emerald-50 text-emerald-700",
+  AppealRejected: "bg-red-50 text-red-700",
+  ResumeRequested: "bg-amber-50 text-amber-700",
+  ResumeApproved: "bg-emerald-50 text-emerald-700",
+  ResumeRejected: "bg-red-50 text-red-700",
 };
 
 export default function ActivityPage() {
-const user = useAuth((s) => s.user);
+  const user = useAuth((s) => s.user);
   const canRevert = user?.role === "Admin" || user?.role === "FacultySecretary";
   const qc = useQueryClient();
 
   const [f, setF] = useState({ entity: "all", action: "all" });
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<ActivityLogItem | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["activity", f, page],
@@ -47,7 +61,7 @@ const user = useAuth((s) => s.user);
     mutationFn: (id: number) => adminApi.revertLog(id),
     onSuccess: (msg) => {
       toast.success(typeof msg === "string" ? msg : "Action undone");
-      qc.invalidateQueries();   // التراجع بيغيّر طلاب وكورسات وغيره
+      qc.invalidateQueries(); // التراجع بيغيّر طلاب وكورسات وغيره
       setTarget(null);
     },
     onError: (e: Error) => {
@@ -67,13 +81,13 @@ const user = useAuth((s) => s.user);
         <FilterSelect
           label="Type"
           value={f.entity}
-          onChange={(v) => { setPage(1); setF({ ...f, entity: v }); }}
+          onChange={(v) => { setPage(1); setOpen(null); setF({ ...f, entity: v }); }}
           options={ENTITIES.map((e) => ({ value: e, label: e }))}
         />
         <FilterSelect
           label="Action"
           value={f.action}
-          onChange={(v) => { setPage(1); setF({ ...f, action: v }); }}
+          onChange={(v) => { setPage(1); setOpen(null); setF({ ...f, action: v }); }}
           options={ACTIONS.map((a) => ({ value: a, label: a }))}
         />
       </div>
@@ -100,34 +114,52 @@ const user = useAuth((s) => s.user);
               <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No activity yet.</td></tr>
             )}
             {items.map((l) => (
-              <tr key={l.id} className="border-b border-slate-100 last:border-0">
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{new Date(l.timestamp).toLocaleString()}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-slate-800">{l.actorName || "—"}</div>
-                  <div className="text-xs text-slate-500">{l.actorRole}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${TONE[l.action] ?? "bg-slate-100 text-slate-700"}`}>
-                    {l.action}
-                  </span>
-                  <div className="mt-1 text-xs text-slate-500">{l.entityType}</div>
-                </td>
-                <td className="px-4 py-3 text-slate-700">
-                  {l.description}
-                  {l.isReverted && <span className="ml-2 text-xs font-semibold text-purple-600">(undone)</span>}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {canRevert && l.canRevert && (
-                    <button
-                      type="button"
-                      onClick={() => setTarget(l)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      <Undo2 size={14} /> Undo
-                    </button>
-                  )}
-                </td>
-              </tr>
+              <Fragment key={l.id}>
+                <tr className="border-b border-slate-100 last:border-0">
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{new Date(l.timestamp).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-800">{l.actorName || "—"}</div>
+                    <div className="text-xs text-slate-500">{l.actorRole}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${TONE[l.action] ?? "bg-slate-100 text-slate-700"}`}>
+                      {l.action}
+                    </span>
+                    <div className="mt-1 text-xs text-slate-500">{l.entityType}</div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {l.description}
+                    {l.isReverted && <span className="ml-2 text-xs font-semibold text-purple-600">(undone)</span>}
+                    {(l.oldValues || l.newValues) && (
+                      <button
+                        type="button"
+                        onClick={() => setOpen(open === l.id ? null : l.id)}
+                        className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800"
+                      >
+                        Details <ChevronDown size={13} className={open === l.id ? "rotate-180" : ""} />
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {canRevert && l.canRevert && (
+                      <button
+                        type="button"
+                        onClick={() => setTarget(l)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <Undo2 size={14} /> Undo
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {open === l.id && (
+                  <tr className="border-b border-slate-100 bg-white">
+                    <td colSpan={5} className="px-4 py-3">
+                      <ChangeDetails oldValues={l.oldValues} newValues={l.newValues} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -139,7 +171,7 @@ const user = useAuth((s) => s.user);
           <button
             type="button"
             disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => { setOpen(null); setPage((p) => p - 1); }}
             className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
           >
             Previous
@@ -148,7 +180,7 @@ const user = useAuth((s) => s.user);
           <button
             type="button"
             disabled={page >= pages}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => { setOpen(null); setPage((p) => p + 1); }}
             className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
           >
             Next
