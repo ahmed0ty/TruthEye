@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -175,18 +175,27 @@ function parseIdentifiers(text: string) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NID_RE = /^\d{14}$/;
 
-// Reads every cell of the first sheet as text and keeps those that look like an email or a 14-digit national ID
+// Reads every cell of the first sheet (.xlsx or .csv) as text and keeps those that look like an email or a 14-digit national ID
 async function readSheetIdentifiers(file: File): Promise<string[]> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: "" });
   const found = new Set<string>();
-  for (const row of rows)
-    for (const cell of row) {
-      const v = String(cell ?? "").trim().replace(/^'/, "");
-      if (EMAIL_RE.test(v) || NID_RE.test(v)) found.add(v);
-    }
+  const add = (raw: unknown) => {
+    const v = String(raw ?? "").trim().replace(/^'/, "");
+    if (EMAIL_RE.test(v) || NID_RE.test(v)) found.add(v);
+  };
+
+  if (/\.csv$/i.test(file.name)) {
+    const text = await file.text();
+    for (const line of text.split(/\r?\n/))
+      for (const cell of line.split(",")) add(cell.trim().replace(/^"|"$/g, ""));
+  } else {
+    const ExcelJS = await import("exceljs");
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer());
+    const sheet = wb.worksheets[0];
+    sheet?.eachRow({ includeEmpty: false }, (row) =>
+      row.eachCell({ includeEmpty: false }, (cell) => add(cell.text)),
+    );
+  }
   return [...found];
 }
 
@@ -372,13 +381,18 @@ function StudentsPanel({ course }: { course: Course }) {
   // excel mode
   const pickSheet = async (f: File | undefined) => {
     if (!f) return;
+    // Limit size before parsing: spreadsheet parsers are the riskiest part of this page
+    if (f.size > 2 * 1024 * 1024) {
+      toast.error("The file is too large. Maximum size is 2 MB.");
+      return;
+    }
     try {
       const list = await readSheetIdentifiers(f);
       setSheetIds(list);
       setSheetName(f.name);
       if (list.length === 0) toast.error("No emails or 14-digit national IDs were found in the sheet.");
     } catch {
-      toast.error("Couldn't read the file. Use .xlsx, .xls or .csv.");
+      toast.error("Couldn't read the file. Use .xlsx or .csv.");
     }
   };
 
@@ -481,7 +495,7 @@ function StudentsPanel({ course }: { course: Course }) {
               </p>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200">
                 <Upload size={16} /> Choose Excel / CSV file
-                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => pickSheet(e.target.files?.[0])} />
+                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => pickSheet(e.target.files?.[0])} />
               </label>
               {sheetName && (
                 <p className="flex items-center gap-2 text-sm text-slate-600">

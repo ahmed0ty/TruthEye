@@ -1,4 +1,5 @@
-﻿// // using AutoMapper;
+﻿using TruthEye.Exceptions;
+// // using AutoMapper;
 // // using TruthEye.DTOs;
 // // using TruthEye.Entities;
 // // using TruthEye.UnitOfWorkk;
@@ -720,6 +721,7 @@
 //         }
 //     }
 // }
+
 using AutoMapper;
 using TruthEye.DTOs;
 using TruthEye.Entities;
@@ -764,7 +766,7 @@ namespace TruthEye.Services
                     var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
  
                     if (exam == null)
-                        throw new Exception("Exam not found");
+                        throw new NotFoundException("Exam not found");
  
                     return _mapper.Map<ExamDto>(exam);
                 },
@@ -816,7 +818,7 @@ namespace TruthEye.Services
                         .GetByIdAsync(studentId, s => s.RegisteredCourses);
  
                     if (student == null)
-                        throw new Exception("Student not found");
+                        throw new NotFoundException("Student not found");
  
                     var courseIds = student.RegisteredCourses.Select(c => c.Id).ToList();
  
@@ -833,6 +835,9 @@ namespace TruthEye.Services
  
         public async Task<ExamDto> CreateExamAsync(CreateExamDto createExamDto, int doctorId)
         {
+            if (createExamDto.EndTime <= createExamDto.StartTime)
+                throw new BadRequestException("End time must be after start time");
+
             var exam = _mapper.Map<Exam>(createExamDto);
             exam.DoctorId = doctorId;
             exam.CreatedAt = DateTime.UtcNow;
@@ -853,9 +858,12 @@ namespace TruthEye.Services
  
         public async Task<ExamDto> UpdateExamAsync(int examId, CreateExamDto updateExamDto)
         {
+            if (updateExamDto.EndTime <= updateExamDto.StartTime)
+                throw new BadRequestException("End time must be after start time");
+
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
             if (exam == null)
-                throw new Exception("Exam not found");
+                throw new NotFoundException("Exam not found");
  
             // The mapping can reset Status to "Draft", so keep the current value
             var currentStatus = exam.Status;
@@ -875,18 +883,18 @@ namespace TruthEye.Services
         public async Task<ExamDto> SetExamStatusAsync(int examId, int doctorId, string status)
         {
             if (status != "Active" && status != "Draft")
-                throw new Exception("Invalid status");
+                throw new BadRequestException("Invalid status");
  
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
             if (exam == null || exam.DoctorId != doctorId)
-                throw new Exception("Access denied or exam not found");
+                throw new NotFoundException("Access denied or exam not found");
  
             if (status == "Active")
             {
                 var questions = await _unitOfWork.Repository<Question>()
                     .FindAsync(q => q.ExamId == examId);
                 if (!questions.Any())
-                    throw new Exception("Add at least one question before publishing");
+                    throw new BadRequestException("Add at least one question before publishing");
             }
  
             exam.Status = status;
@@ -916,7 +924,7 @@ namespace TruthEye.Services
         {
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
             if (exam == null)
-                throw new Exception("Exam not found");
+                throw new NotFoundException("Exam not found");
  
             await _unitOfWork.Repository<Exam>().DeleteAsync(exam);
             await _unitOfWork.SaveChangesAsync();
@@ -936,10 +944,10 @@ namespace TruthEye.Services
                 {
                     // MCQ: options are mandatory, ModelAnswer is NOT needed
                     if (questionDto.Options == null || !questionDto.Options.Any())
-                        throw new Exception("MCQ question must have at least one option");
+                        throw new BadRequestException("MCQ question must have at least one option");
  
                     if (!questionDto.Options.Any(o => o.IsCorrect))
-                        throw new Exception("MCQ question must have at least one correct option");
+                        throw new BadRequestException("MCQ question must have at least one correct option");
  
                     _logger.LogInformation("Creating MCQ question");
                     var mcqQuestion = _mapper.Map<MCQQuestion>(questionDto);
@@ -964,7 +972,7 @@ namespace TruthEye.Services
                 {
                     // Written: ModelAnswer is mandatory, Options are NOT needed
                     if (string.IsNullOrWhiteSpace(questionDto.ModelAnswer))
-                        throw new Exception("Model answer is required for written questions");
+                        throw new BadRequestException("Model answer is required for written questions");
  
                     if (string.IsNullOrWhiteSpace(questionDto.EvaluationModel))
                         questionDto.EvaluationModel = "Default";
@@ -983,7 +991,7 @@ namespace TruthEye.Services
                 }
                 else
                 {
-                    throw new Exception("Invalid question type");
+                    throw new BadRequestException("Invalid question type");
                 }
  
                 await _unitOfWork.Repository<Question>().AddAsync(question);
@@ -1010,7 +1018,7 @@ namespace TruthEye.Services
         {
             var question = await _unitOfWork.Repository<Question>().GetByIdAsync(questionId);
             if (question == null)
-                throw new Exception("Question not found");
+                throw new NotFoundException("Question not found");
  
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(question.ExamId);
  
@@ -1051,7 +1059,7 @@ namespace TruthEye.Services
         {
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
             if (exam == null || exam.DoctorId != doctorId)
-                throw new Exception("Access denied or exam not found");
+                throw new NotFoundException("Access denied or exam not found");
  
             // Completed and TimedOut attempts both count; only unfinished ones are hidden
             var sessions = (await _unitOfWork.Repository<ExamSession>()
@@ -1111,7 +1119,7 @@ namespace TruthEye.Services
         {
             var exam = await _unitOfWork.Repository<Exam>().GetByIdAsync(examId);
             if (exam == null || exam.DoctorId != doctorId)
-                throw new Exception("Access denied or exam not found");
+                throw new NotFoundException("Access denied or exam not found");
  
             var sessions = await _unitOfWork.Repository<ExamSession>()
                 .FindAsync(es => es.ExamId == examId && es.Status != "InProgress");
@@ -1139,7 +1147,7 @@ namespace TruthEye.Services
                 .GetByIdAsync(sessionId, s => s.Student!, s => s.Exam!);
  
             if (session == null || session.Exam == null || session.Exam.DoctorId != doctorId)
-                throw new Exception("Access denied or session not found");
+                throw new NotFoundException("Access denied or session not found");
  
             var answers = await _sessionService.GetExamAnswersAsync(sessionId);
  
@@ -1167,7 +1175,7 @@ namespace TruthEye.Services
         public async Task EnsureQuestionOwnerAsync(int questionId, int doctorId)
         {
             var q = await _unitOfWork.Repository<Question>().GetByIdAsync(questionId);
-            if (q == null) throw new Exception("Question not found");
+            if (q == null) throw new NotFoundException("Question not found");
             await EnsureOwnerAsync(q.ExamId, doctorId);
         }
  

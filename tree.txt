@@ -1,0 +1,693 @@
+﻿├── Front_End
+│   └── truth-eye-web
+│       ├── public
+│       │   ├── mediapipe
+│       │   │   ├── wasm
+│       │   │   │   ├── vision_wasm_internal.js
+│       │   │   │   ├── vision_wasm_internal.wasm
+│       │   │   │   ├── vision_wasm_module_internal.js
+│       │   │   │   ├── vision_wasm_module_internal.wasm
+│       │   │   │   ├── vision_wasm_nosimd_internal.js
+│       │   │   │   └── vision_wasm_nosimd_internal.wasm
+│       │   │   ├── efficientdet_lite0.tflite
+│       │   │   └── MODELS.md
+│       │   ├── file.svg
+│       │   ├── globe.svg
+│       │   ├── next.svg
+│       │   ├── vercel.svg
+│       │   └── window.svg
+│       ├── src
+│       │   ├── app
+│       │   │   ├── admin
+│       │   │   │   ├── activity
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── admins
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── ai-config
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── analytics
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── courses
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── departments
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── doctors
+│       │   │   │   │   ├── reviews
+│       │   │   │   │   │   └── page.tsx
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── faculties
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── proctors
+│       │   │   │   │   ├── reviews
+│       │   │   │   │   │   └── page.tsx
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── reviews
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── staff
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── students
+│       │   │   │   │   ├── import
+│       │   │   │   │   │   └── page.tsx
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── supports
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── universities
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── template.tsx
+│       │   │   ├── change-password
+│       │   │   │   └── page.tsx
+│       │   │   ├── chat
+│       │   │   │   ├── layout.tsx
+│       │   │   │   └── page.tsx
+│       │   │   ├── doctor
+│       │   │   │   ├── appeals
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── exams
+│       │   │   │   │   ├── [examId]
+│       │   │   │   │   │   └── page.tsx
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── grading
+│       │   │   │   │   └── [sessionId]
+│       │   │   │   │       └── page.tsx
+│       │   │   │   ├── results
+│       │   │   │   │   ├── [examId]
+│       │   │   │   │   │   ├── [sessionId]
+│       │   │   │   │   │   │   └── page.tsx
+│       │   │   │   │   │   ├── analytics
+│       │   │   │   │   │   │   └── page.tsx
+│       │   │   │   │   │   └── page.tsx
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── support
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── template.tsx
+│       │   │   ├── exam
+│       │   │   │   └── [sessionId]
+│       │   │   │       └── page.tsx
+│       │   │   ├── login
+│       │   │   │   └── page.tsx
+│       │   │   ├── proctor
+│       │   │   │   ├── alerts
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── live
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── template.tsx
+│       │   │   ├── profile
+│       │   │   │   ├── layout.tsx
+│       │   │   │   └── page.tsx
+│       │   │   ├── register
+│       │   │   │   └── page.tsx
+│       │   │   ├── student
+│       │   │   │   ├── appeals
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── exams
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── history
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── reports
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── results
+│       │   │   │   │   └── [sessionId]
+│       │   │   │   │       └── page.tsx
+│       │   │   │   ├── support
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── template.tsx
+│       │   │   ├── support
+│       │   │   │   ├── tickets
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── template.tsx
+│       │   │   ├── test
+│       │   │   │   └── page.tsx
+│       │   │   ├── error.tsx
+│       │   │   ├── favicon.ico
+│       │   │   ├── globals.css
+│       │   │   ├── layout.tsx
+│       │   │   ├── not-found.tsx
+│       │   │   └── page.tsx
+│       │   ├── components
+│       │   │   ├── admin
+│       │   │   │   ├── change-details.tsx
+│       │   │   │   └── reset-password-dialog.tsx
+│       │   │   ├── analytics
+│       │   │   │   └── bars.tsx
+│       │   │   ├── auth
+│       │   │   │   ├── auth-shell.tsx
+│       │   │   │   ├── eye-guardian.tsx
+│       │   │   │   ├── field.tsx
+│       │   │   │   └── intro-gate.tsx
+│       │   │   ├── charts
+│       │   │   │   └── charts.tsx
+│       │   │   ├── chat
+│       │   │   │   └── chat-closed.tsx
+│       │   │   ├── dashboard
+│       │   │   │   ├── admin-charts.tsx
+│       │   │   │   ├── doctor-charts.tsx
+│       │   │   │   ├── notification-bell.tsx
+│       │   │   │   └── shell.tsx
+│       │   │   ├── exam
+│       │   │   │   ├── exam-lock-ui.tsx
+│       │   │   │   └── resume-request.tsx
+│       │   │   ├── proctoring
+│       │   │   │   ├── cheat-timeline.tsx
+│       │   │   │   ├── evidence-thumb.tsx
+│       │   │   │   ├── integrity-badge.tsx
+│       │   │   │   └── integrity-filter.tsx
+│       │   │   ├── profile
+│       │   │   │   └── avatar-uploader.tsx
+│       │   │   ├── review
+│       │   │   │   ├── evidence-image.tsx
+│       │   │   │   ├── resume-inbox.tsx
+│       │   │   │   └── reviews-view.tsx
+│       │   │   ├── support
+│       │   │   │   └── my-tickets.tsx
+│       │   │   ├── ui
+│       │   │   │   ├── avatar.tsx
+│       │   │   │   ├── confirm.tsx
+│       │   │   │   ├── data-table.tsx
+│       │   │   │   ├── empty-state.tsx
+│       │   │   │   ├── filter-select.tsx
+│       │   │   │   ├── form-fields.tsx
+│       │   │   │   ├── modal.tsx
+│       │   │   │   ├── page-header.tsx
+│       │   │   │   ├── row-actions.tsx
+│       │   │   │   ├── stat-card.tsx
+│       │   │   │   └── states.tsx
+│       │   │   ├── logo.tsx
+│       │   │   ├── providers.tsx
+│       │   │   └── theme-toggle.tsx
+│       │   ├── hooks
+│       │   │   ├── use-chat-hub.ts
+│       │   │   ├── use-chat-status.ts
+│       │   │   ├── use-crud.ts
+│       │   │   ├── use-notifications.ts
+│       │   │   └── use-server-table.ts
+│       │   ├── lib
+│       │   │   ├── api
+│       │   │   │   ├── admin.ts
+│       │   │   │   ├── analytics.ts
+│       │   │   │   ├── auth.ts
+│       │   │   │   ├── chat.ts
+│       │   │   │   ├── client.ts
+│       │   │   │   ├── doctor.ts
+│       │   │   │   ├── download.ts
+│       │   │   │   ├── evidence.ts
+│       │   │   │   ├── exam-take.ts
+│       │   │   │   ├── grading.ts
+│       │   │   │   ├── notifications.ts
+│       │   │   │   ├── proctor.ts
+│       │   │   │   ├── profile.ts
+│       │   │   │   ├── reports.ts
+│       │   │   │   ├── resume.ts
+│       │   │   │   ├── reviews.ts
+│       │   │   │   ├── settings.ts
+│       │   │   │   ├── student.ts
+│       │   │   │   ├── support.ts
+│       │   │   │   └── tickets.ts
+│       │   │   ├── auth
+│       │   │   │   ├── jwt.ts
+│       │   │   │   ├── refresh.ts
+│       │   │   │   ├── storage.ts
+│       │   │   │   └── store.ts
+│       │   │   ├── proctoring
+│       │   │   │   ├── alarm.ts
+│       │   │   │   ├── events.ts
+│       │   │   │   ├── paper-detector.ts
+│       │   │   │   ├── use-live-monitor.ts
+│       │   │   │   └── use-proctoring.ts
+│       │   │   ├── csv.ts
+│       │   │   ├── enums.ts
+│       │   │   ├── exam-lock.ts
+│       │   │   ├── export-csv.ts
+│       │   │   ├── format.ts
+│       │   │   ├── media.ts
+│       │   │   ├── nav.ts
+│       │   │   ├── ticket-meta.ts
+│       │   │   └── utils.ts
+│       │   ├── types
+│       │   │   ├── admin.ts
+│       │   │   ├── analytics.ts
+│       │   │   ├── api.ts
+│       │   │   ├── chat.ts
+│       │   │   ├── doctor.ts
+│       │   │   ├── exam.ts
+│       │   │   ├── exam-take.ts
+│       │   │   ├── grading.ts
+│       │   │   ├── notification.ts
+│       │   │   ├── proctor.ts
+│       │   │   ├── report.ts
+│       │   │   ├── support.ts
+│       │   │   └── ticket.ts
+│       │   └── proxy.ts
+│       ├── .env.local
+│       ├── .gitignore
+│       ├── eslint.config.mjs
+│       ├── next.config.ts
+│       ├── next-env.d.ts
+│       ├── package.json
+│       ├── package-lock.json
+│       ├── postcss.config.mjs
+│       ├── README.md
+│       ├── students.xlsx
+│       ├── tsconfig.json
+│       └── tsconfig.tsbuildinfo
+├── TruthEye
+│   ├── AI-BERT-Service
+│   │   ├── body.json
+│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile.sbert
+│   │   └── sbert_server.py
+│   ├── App_Data
+│   │   └── evidence
+│   │       ├── 1301de6bbad54202b185308e2797bee3.jpg
+│   │       ├── 19d419fd5ab54558a38892ea68b650f9.jpg
+│   │       ├── 29422b40b3554ed7a3a4d49a80774b90.jpg
+│   │       ├── 3719ae95fd9b4164961f55cdedf04900.jpg
+│   │       ├── 374490b2bd2f4547979825f05b39ee7b.jpg
+│   │       ├── 657b9838b7494544aec31a91bb3c5fc1.jpg
+│   │       ├── 6dbf7335054647d18a124967e8d980e3.jpg
+│   │       ├── 742af1cf63f04c29af98619258184f7e.jpg
+│   │       ├── 7b982aca310a47b583af1463a7b61066.jpg
+│   │       ├── 91ca7ebebc4b4f3797aaefcb365cdcd9.jpg
+│   │       ├── a80fc73ea7184921965f54c379d9bf43.jpg
+│   │       ├── ac2d9a56ff7347958a478489468cc6d2.jpg
+│   │       ├── b314ccdd107f4a54a47b9d76fa326f7b.jpg
+│   │       ├── b4b549f035ff4ea69f3380918920fe96.jpg
+│   │       ├── cb81a2b2d3e6472687e27dc062770184.jpg
+│   │       ├── e01a2834fab844e8b2daac5805f60413.jpg
+│   │       ├── e5a8c1d3deaa42f1885067e609890038.jpg
+│   │       ├── e6ce3b6d47844c67852660166b5b2bc4.jpg
+│   │       ├── f422e88a23c54d72bec50a67780481eb.jpg
+│   │       └── f450d9b1a44040358ebd6f8d8a560469.jpg
+│   ├── Controllers
+│   │   ├── ActivityLogController.cs
+│   │   ├── AdminController.cs
+│   │   ├── AILogController.cs
+│   │   ├── AnalyticsController.cs
+│   │   ├── AppealController.cs
+│   │   ├── AuthController.cs
+│   │   ├── ChatController.cs
+│   │   ├── ContactsController.cs
+│   │   ├── CourseController.cs
+│   │   ├── CourseEnrollmentController.cs
+│   │   ├── DepartmentController.cs
+│   │   ├── DirectorController.cs
+│   │   ├── DoctorPortalController.cs
+│   │   ├── ExamController.cs
+│   │   ├── ExamGuardController.cs
+│   │   ├── ExamSessionController.cs
+│   │   ├── FacultyController.cs
+│   │   ├── GradingController.cs
+│   │   ├── NotificationController.cs
+│   │   ├── ProfileController.cs
+│   │   ├── ReportController.cs
+│   │   ├── ResumeController.cs
+│   │   ├── SessionReviewController.cs
+│   │   ├── StaffController.cs
+│   │   ├── SupportTicketController.cs
+│   │   └── UniversityController.cs
+│   ├── Data
+│   │   ├── Enum
+│   │   │   ├── AcademicDegree.cs
+│   │   │   ├── ExamAttemptStatus.cs
+│   │   │   └── Year.cs
+│   │   └── AppDbContext.cs
+│   ├── DTOs
+│   │   ├── AdminDto.cs
+│   │   ├── AnalyticsDtos.cs
+│   │   ├── ChangePasswordDto.cs
+│   │   ├── CommonMistakeDto.cs
+│   │   ├── CourseDto.cs
+│   │   ├── CreateCourseDto.cs
+│   │   ├── CreateDepartmentDto.cs
+│   │   ├── CreateExamDto.cs
+│   │   ├── CreateFacultyDto.cs
+│   │   ├── CreateQuestionDto.cs
+│   │   ├── CreateSupportTicketDto.cs
+│   │   ├── CreateUniversityDto.cs
+│   │   ├── DepartmentDto.cs
+│   │   ├── DoctorCourseDto.cs
+│   │   ├── DoctorDto.cs
+│   │   ├── ExamAnalysisDto.cs
+│   │   ├── ExamAnswersDto.cs
+│   │   ├── ExamDto.cs
+│   │   ├── ExamResultDto.cs
+│   │   ├── ExamSessionDto.cs
+│   │   ├── FacultyDto.cs
+│   │   ├── GradingDtos.cs
+│   │   ├── LoginDto.cs
+│   │   ├── MCQOptionDto.cs
+│   │   ├── PagedDtos.cs
+│   │   ├── ProctorDto.cs
+│   │   ├── QuestionDto.cs
+│   │   ├── QuestionNavigationDto.cs
+│   │   ├── QuestionWithAnswerDto.cs
+│   │   ├── RefreshRequest.cs
+│   │   ├── RegisterAdminDto.cs
+│   │   ├── RegisterDoctorDto.cs
+│   │   ├── RegisterProctorDto.cs
+│   │   ├── RegisterStudentDto.cs
+│   │   ├── RegisterSupportDto.cs
+│   │   ├── RegisterUserDto.cs
+│   │   ├── ResumeDtos.cs
+│   │   ├── ReviewDtos.cs
+│   │   ├── StaffDtos.cs
+│   │   ├── StartExamSessionDto.cs
+│   │   ├── StudentAnswerDto.cs
+│   │   ├── StudentDto.cs
+│   │   ├── StudentExamDetailsDto.cs
+│   │   ├── StudentExamResultDto.cs
+│   │   ├── StudentQuestionDto.cs
+│   │   ├── SubmitAnswerDto.cs
+│   │   ├── SubmitExamDto.cs
+│   │   ├── SupportDto.cs
+│   │   ├── SupportTicketDto.cs
+│   │   ├── UniversityDto.cs
+│   │   ├── UpdateAdminDto.cs
+│   │   ├── UpdateCourseDto.cs
+│   │   ├── UpdateDepartmentDto.cs
+│   │   ├── UpdateDoctorDto.cs
+│   │   ├── UpdateFacultyDto.cs
+│   │   ├── UpdateProctorDto.cs
+│   │   ├── UpdateStudentDto.cs
+│   │   ├── UpdateSupportDto.cs
+│   │   ├── UpdateSupportTicketDto.cs
+│   │   ├── UpdateUniversityDto.cs
+│   │   └── UserDto.cs
+│   ├── Entities
+│   │   ├── Data
+│   │   │   └── DesignTimeDbContextFactory.cs
+│   │   ├── Admin.cs
+│   │   ├── AIConfig.cs
+│   │   ├── AIEvaluationResult.cs
+│   │   ├── AILog.cs
+│   │   ├── Answer.cs
+│   │   ├── AnswerOption.cs
+│   │   ├── Appeal.cs
+│   │   ├── BaseEntity.cs
+│   │   ├── ChatMessage.cs
+│   │   ├── Course.cs
+│   │   ├── Department.cs
+│   │   ├── Doctor.cs
+│   │   ├── EmbeddingResponse.cs
+│   │   ├── Exam.cs
+│   │   ├── ExamAttempt.cs
+│   │   ├── ExamSession.cs
+│   │   ├── Faculty.cs
+│   │   ├── FacultySecretary.cs
+│   │   ├── GradeAdjustment.cs
+│   │   ├── Loginlockout.cs
+│   │   ├── MCQOption.cs
+│   │   ├── MCQQuestion.cs
+│   │   ├── NextQuestionRequest.cs
+│   │   ├── Notification.cs
+│   │   ├── PerformanceReport.cs
+│   │   ├── Proctor.cs
+│   │   ├── ProctorSession.cs
+│   │   ├── Question.cs
+│   │   ├── RefreshToken.cs
+│   │   ├── Report.cs
+│   │   ├── ResumeRequest.cs
+│   │   ├── Role.cs
+│   │   ├── SessionReview.cs
+│   │   ├── Student.cs
+│   │   ├── StudentAnswer.cs
+│   │   ├── StudentCourse.cs
+│   │   ├── SuperAdmin.cs
+│   │   ├── Support.cs
+│   │   ├── SupportTicket.cs
+│   │   ├── SystemLog.cs
+│   │   ├── TechnicalStaff.cs
+│   │   ├── University.cs
+│   │   ├── User.cs
+│   │   ├── UserSession.cs
+│   │   └── WrittenQuestion.cs
+│   ├── Exceptions
+│   │   └── AppExceptions.cs
+│   ├── Hubs
+│   │   ├── ChatHub.cs
+│   │   ├── ExamMonitoringHub.cs
+│   │   └── NotificationHub.cs
+│   ├── Interfaces
+│   │   ├── IRepository.cs
+│   │   └── ISoftDelete.cs
+│   ├── logs
+│   │   ├── log-20261028_001.txt
+│   │   ├── log-20261028_002.txt
+│   │   ├── log-20261028_003.txt
+│   │   ├── log-20261028_004.txt
+│   │   ├── log-20261029.txt
+│   │   ├── log-20261029_001.txt
+│   │   ├── log-20261029_002.txt
+│   │   ├── log-20261029_003.txt
+│   │   ├── log-20261030.txt
+│   │   ├── log-20261030_001.txt
+│   │   ├── log-20261031.txt
+│   │   ├── log-20261031_001.txt
+│   │   ├── log-20261031_002.txt
+│   │   ├── log-20261031_003.txt
+│   │   ├── log-20261031_004.txt
+│   │   ├── log-20261031_005.txt
+│   │   ├── log-20261102.txt
+│   │   ├── log-20261102_001.txt
+│   │   ├── log-20261102_002.txt
+│   │   ├── log-20261103.txt
+│   │   ├── log-20261103_001.txt
+│   │   ├── log-20261103_002.txt
+│   │   ├── log-20261103_003.txt
+│   │   ├── log-20261104.txt
+│   │   ├── log-20261104_001.txt
+│   │   ├── log-20261106.txt
+│   │   ├── log-20261106_001.txt
+│   │   ├── log-20261106_002.txt
+│   │   ├── log-20261106_003.txt
+│   │   ├── log-20261120.txt
+│   │   └── log-20261120_001.txt
+│   ├── Mapping
+│   │   └── MappingProfile.cs
+│   ├── Middleware
+│   │   ├── ApiErrors.cs
+│   │   └── ExceptionHandlingMiddleware.cs
+│   ├── Migrations
+│   │   ├── 20251030205634_init.cs
+│   │   ├── 20251030205634_init.Designer.cs
+│   │   ├── 20251031024820_init3.cs
+│   │   ├── 20251031024820_init3.Designer.cs
+│   │   ├── 20251101152732_init4.cs
+│   │   ├── 20251101152732_init4.Designer.cs
+│   │   ├── 20261010123259_MakeTicketResolutionNullable.cs
+│   │   ├── 20261010123259_MakeTicketResolutionNullable.Designer.cs
+│   │   ├── 20261013071110_RefreshTokens.cs
+│   │   ├── 20261013071110_RefreshTokens.Designer.cs
+│   │   ├── 20261013150446_AddRefreshTokens.cs
+│   │   ├── 20261013150446_AddRefreshTokens.Designer.cs
+│   │   ├── 20261015234037_AddLoginLockout.cs
+│   │   ├── 20261015234037_AddLoginLockout.Designer.cs
+│   │   ├── 20261015235215_AddLoginLockouts.cs
+│   │   ├── 20261015235215_AddLoginLockouts.Designer.cs
+│   │   ├── 20261031120646_AddFacultyStaffAndAuditTrail.cs
+│   │   ├── 20261031120646_AddFacultyStaffAndAuditTrail.Designer.cs
+│   │   ├── 20261101204725_AddMustChangePassword.cs
+│   │   ├── 20261101204725_AddMustChangePassword.Designer.cs
+│   │   ├── 20261102125457_AddSessionReviews.cs
+│   │   ├── 20261102125457_AddSessionReviews.Designer.cs
+│   │   ├── 20261102232819_AddGradingAndAppeals.cs
+│   │   ├── 20261102232819_AddGradingAndAppeals.Designer.cs
+│   │   ├── 20261104045003_AddUserSessions.cs
+│   │   ├── 20261104045003_AddUserSessions.Designer.cs
+│   │   ├── 20261108105528_AddResumeRequests.cs
+│   │   ├── 20261108105528_AddResumeRequests.Designer.cs
+│   │   └── AppDbContextModelSnapshot.cs
+│   ├── Properties
+│   │   └── launchSettings.json
+│   ├── publish
+│   │   ├── AI-BERT-Service
+│   │   │   └── body.json
+│   │   ├── wwwroot
+│   │   │   └── uploads
+│   │   │       └── profiles
+│   │   │           └── 4f6b9e5125784e3b936d5240edd89c06.jpg
+│   │   ├── Apache.Arrow.dll
+│   │   ├── appsettings.Development.json
+│   │   ├── appsettings.json
+│   │   ├── appsettings.Production.json
+│   │   ├── AutoMapper.dll
+│   │   ├── AutoMapper.Extensions.Microsoft.DependencyInjection.dll
+│   │   ├── Azure.Core.dll
+│   │   ├── Azure.Identity.dll
+│   │   ├── Azure.Storage.Blobs.dll
+│   │   ├── Azure.Storage.Common.dll
+│   │   ├── ClosedXML.dll
+│   │   ├── ClosedXML.Parser.dll
+│   │   ├── DocumentFormat.OpenXml.dll
+│   │   ├── DocumentFormat.OpenXml.Framework.dll
+│   │   ├── ExcelNumberFormat.dll
+│   │   ├── Microsoft.AspNetCore.Authentication.JwtBearer.dll
+│   │   ├── Microsoft.AspNetCore.OpenApi.dll
+│   │   ├── Microsoft.Bcl.AsyncInterfaces.dll
+│   │   ├── Microsoft.Bcl.TimeProvider.dll
+│   │   ├── Microsoft.Data.SqlClient.dll
+│   │   ├── Microsoft.Data.SqlClient.SNI.dll
+│   │   ├── Microsoft.EntityFrameworkCore.Abstractions.dll
+│   │   ├── Microsoft.EntityFrameworkCore.dll
+│   │   ├── Microsoft.EntityFrameworkCore.Relational.dll
+│   │   ├── Microsoft.EntityFrameworkCore.SqlServer.dll
+│   │   ├── Microsoft.Extensions.Configuration.Abstractions.dll
+│   │   ├── Microsoft.Extensions.DependencyInjection.Abstractions.dll
+│   │   ├── Microsoft.Extensions.DependencyModel.dll
+│   │   ├── Microsoft.Extensions.Diagnostics.Abstractions.dll
+│   │   ├── Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
+│   │   ├── Microsoft.Extensions.FileProviders.Abstractions.dll
+│   │   ├── Microsoft.Extensions.Hosting.Abstractions.dll
+│   │   ├── Microsoft.Extensions.Logging.Abstractions.dll
+│   │   ├── Microsoft.Extensions.Options.dll
+│   │   ├── Microsoft.Extensions.Primitives.dll
+│   │   ├── Microsoft.Identity.Client.dll
+│   │   ├── Microsoft.Identity.Client.Extensions.Msal.dll
+│   │   ├── Microsoft.IdentityModel.Abstractions.dll
+│   │   ├── Microsoft.IdentityModel.JsonWebTokens.dll
+│   │   ├── Microsoft.IdentityModel.Logging.dll
+│   │   ├── Microsoft.IdentityModel.Protocols.dll
+│   │   ├── Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+│   │   ├── Microsoft.IdentityModel.Tokens.dll
+│   │   ├── Microsoft.OpenApi.dll
+│   │   ├── Microsoft.SqlServer.Server.dll
+│   │   ├── Microsoft.Win32.SystemEvents.dll
+│   │   ├── package.json
+│   │   ├── package-lock.json
+│   │   ├── qpdf.dll
+│   │   ├── QuestPDF.dll
+│   │   ├── QuestPDF.Fonts.Lato.br
+│   │   ├── QuestPdfSkia.dll
+│   │   ├── RBush.dll
+│   │   ├── Serilog.AspNetCore.dll
+│   │   ├── Serilog.dll
+│   │   ├── Serilog.Extensions.Hosting.dll
+│   │   ├── Serilog.Extensions.Logging.dll
+│   │   ├── Serilog.Formatting.Compact.dll
+│   │   ├── Serilog.Settings.Configuration.dll
+│   │   ├── Serilog.Sinks.Console.dll
+│   │   ├── Serilog.Sinks.Debug.dll
+│   │   ├── Serilog.Sinks.File.dll
+│   │   ├── SixLabors.Fonts.dll
+│   │   ├── Swashbuckle.AspNetCore.Annotations.dll
+│   │   ├── Swashbuckle.AspNetCore.Swagger.dll
+│   │   ├── Swashbuckle.AspNetCore.SwaggerGen.dll
+│   │   ├── Swashbuckle.AspNetCore.SwaggerUI.dll
+│   │   ├── System.ClientModel.dll
+│   │   ├── System.Configuration.ConfigurationManager.dll
+│   │   ├── System.Diagnostics.DiagnosticSource.dll
+│   │   ├── System.Drawing.Common.dll
+│   │   ├── System.IdentityModel.Tokens.Jwt.dll
+│   │   ├── System.IO.Hashing.dll
+│   │   ├── System.IO.Packaging.dll
+│   │   ├── System.IO.Pipelines.dll
+│   │   ├── System.Memory.Data.dll
+│   │   ├── System.Runtime.Caching.dll
+│   │   ├── System.Security.Cryptography.ProtectedData.dll
+│   │   ├── System.Security.Permissions.dll
+│   │   ├── System.Text.Encodings.Web.dll
+│   │   ├── System.Text.Json.dll
+│   │   ├── System.Windows.Extensions.dll
+│   │   ├── TruthEye.deps.json
+│   │   ├── TruthEye.dll
+│   │   ├── TruthEye.exe
+│   │   ├── TruthEye.pdb
+│   │   ├── TruthEye.runtimeconfig.json
+│   │   ├── TruthEye.staticwebassets.endpoints.json
+│   │   └── web.config
+│   ├── Repositories
+│   │   └── Repository.cs
+│   ├── Security
+│   │   ├── AppRoles.cs
+│   │   ├── ChatRules.cs
+│   │   ├── PasswordChangeMiddleware.cs
+│   │   ├── PasswordPolicy.cs
+│   │   ├── RiskCalculator.cs
+│   │   └── StaffRules.cs
+│   ├── Services
+│   │   ├── ActivityActions.cs
+│   │   ├── AIEvaluationService.cs
+│   │   ├── AILogService.cs
+│   │   ├── AnalyticsService.cs
+│   │   ├── AppealService.cs
+│   │   ├── AuthService.cs
+│   │   ├── Blobevidencestore.cs
+│   │   ├── CacheService.cs
+│   │   ├── ChatLockService.cs
+│   │   ├── CourseEnrollmentService.cs
+│   │   ├── CourseService.cs
+│   │   ├── Evidenceretentionworker.cs
+│   │   ├── Evidencestore.cs
+│   │   ├── ExamPresence.cs
+│   │   ├── ExamService.cs
+│   │   ├── ExamSessionService.cs
+│   │   ├── GradingService.cs
+│   │   ├── IAIEvaluationService.cs
+│   │   ├── IAILogService.cs
+│   │   ├── IAuthService.cs
+│   │   ├── ICacheService.cs
+│   │   ├── ICourseService.cs
+│   │   ├── IExamService.cs
+│   │   ├── IExamSessionService.cs
+│   │   ├── INotificationService.cs
+│   │   ├── IReportService.cs
+│   │   ├── ISupportTicketService.cs
+│   │   ├── ISystemLogService.cs
+│   │   ├── LogRetentionWorker.cs
+│   │   ├── NotificationService.cs
+│   │   ├── ReportService.cs
+│   │   ├── ResumeService.cs
+│   │   ├── RobustAIEvaluationService.cs
+│   │   ├── SessionExpiryWorker.cs
+│   │   ├── SessionReviewService.cs
+│   │   ├── Settingscontroller.cs
+│   │   ├── Settingsservice.cs
+│   │   ├── SupportTicketService.cs
+│   │   └── SystemLogService.cs
+│   ├── Swagger
+│   │   ├── ApiErrorResponse.cs
+│   │   ├── ApiResponse.cs
+│   │   └── LoginResponse.cs
+│   ├── UnitOfWorkk
+│   │   ├── IUnitOfWork.cs
+│   │   └── UnitOfWork.cs
+│   ├── wwwroot
+│   │   └── uploads
+│   │       └── profiles
+│   │           └── 4f6b9e5125784e3b936d5240edd89c06.jpg
+│   ├── appsettings.Development.json
+│   ├── appsettings.json
+│   ├── appsettings.Production.json
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── Program.cs
+│   ├── TruthEye.csproj
+│   ├── TruthEye.http
+│   └── update.sql
+├── TruthEye.Tests
+│   ├── AnalyticsTests.cs
+│   ├── ChatLockTests.cs
+│   ├── CourseServiceTests.cs
+│   ├── EnrollmentIsolationTests.cs
+│   ├── FacultyIsolationTests.cs
+│   ├── GradingAppealTests.cs
+│   ├── PagingTests.cs
+│   ├── PasswordAndLoginTests.cs
+│   ├── ResumeTests.cs
+│   ├── RiskCalculatorTests.cs
+│   ├── StaffRulesTests.cs
+│   ├── TestEnv.cs
+│   └── TruthEye.Tests.csproj
+├── .gitattributes
+├── .gitignore
+├── tree.txt
+└── TruthEye.sln

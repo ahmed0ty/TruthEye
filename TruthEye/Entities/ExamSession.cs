@@ -1,4 +1,4 @@
-﻿using TruthEye.DTOs;
+using TruthEye.DTOs;
 
 namespace TruthEye.Entities
 {
@@ -16,6 +16,11 @@ namespace TruthEye.Entities
         public bool IsPassed { get; set; }
         public int StudentId { get; set; }
         public int ExamId { get; set; }
+        public string? EndReason { get; set; }
+
+        // Kept in step with the AI logs, so the review list can sort and filter in SQL
+        public int RiskScore { get; set; }
+        public int ViolationCount { get; set; }
 
         public virtual Student Student { get; set; }
         public virtual Exam Exam { get; set; }

@@ -28,7 +28,6 @@ const base = z.object({
 const createSchema = base.extend({
   email: z.string().trim().email("Invalid email"),
   nationalId: z.string().regex(/^\d{14}$/, "Must be 14 digits"),
-  password: z.string().min(6, "At least 6 characters"),
 });
 
 function SupportForm({ editing, onDone }: { editing: SupportMember | null; onDone: () => void }) {
@@ -57,7 +56,7 @@ function SupportForm({ editing, onDone }: { editing: SupportMember | null; onDon
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateSupport(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createSupport(v),
+      editing ? adminApi.updateSupport(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createSupport({ ...v, sendSetupLink: true }),
     onSuccess: () => {
       toast.success(editing ? "Support member updated" : "Support member created");
       qc.invalidateQueries({ queryKey: ["supports"] });
@@ -81,7 +80,7 @@ function SupportForm({ editing, onDone }: { editing: SupportMember | null; onDon
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <TextField label="Password" type="password" dir="ltr" error={err("password")} {...register("password")} />
+            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
         </>
       )}

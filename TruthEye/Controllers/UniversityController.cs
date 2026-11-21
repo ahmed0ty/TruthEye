@@ -6,6 +6,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using System.Linq.Expressions;
 using TruthEye.DTOs;
 using TruthEye.Entities;
+using TruthEye.Security;
 using TruthEye.Swagger;
 using TruthEye.UnitOfWorkk;
 
@@ -13,12 +14,12 @@ namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize]
+    [Authorize]
     [Produces("application/json")]
     public class UniversityController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly ILogger<UniversityController> _logger; 
+        private readonly ILogger<UniversityController> _logger;
         private readonly IMapper _mapper;
 
         public UniversityController(IUnitOfWork unitOfWork, ILogger<UniversityController> logger, IMapper mapper)
@@ -109,6 +110,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Create new university",
             Description = "Creates a new university with location details",
@@ -175,6 +177,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Update university",
             Description = "Updates an existing university's information",
@@ -253,6 +256,7 @@ namespace TruthEye.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
         [SwaggerOperation(
             Summary = "Delete university",
             Description = "Soft deletes a university",
@@ -323,24 +327,14 @@ namespace TruthEye.Controllers
         {
             try
             {
-                Expression<Func<University, bool>> filter = u => true;
+                var term = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm;
+                var c = string.IsNullOrWhiteSpace(city) ? null : city.ToLower();
+                var k = string.IsNullOrWhiteSpace(country) ? null : country.ToLower();
 
-                if (!string.IsNullOrEmpty(searchTerm))
-                {
-                    filter = u => u.Name.Contains(searchTerm) || u.Location.Contains(searchTerm);
-                }
-
-                if (!string.IsNullOrEmpty(city))
-                {
-                    var originalFilter = filter;
-                    filter = u => originalFilter.Compile()(u) && u.City.ToLower() == city.ToLower();
-                }
-
-                if (!string.IsNullOrEmpty(country))
-                {
-                    var originalFilter = filter;
-                    filter = u => originalFilter.Compile()(u) && u.Country.ToLower() == country.ToLower();
-                }
+                Expression<Func<University, bool>> filter = u =>
+                    (term == null || u.Name.Contains(term) || u.Location.Contains(term))
+                    && (c == null || u.City.ToLower() == c)
+                    && (k == null || u.Country.ToLower() == k);
 
                 Expression<Func<University, object>>[] includes = { u => u.Faculties };
                 var universities = await _unitOfWork.Repository<University>().FindAsync(filter, includes);
@@ -359,8 +353,6 @@ namespace TruthEye.Controllers
                 return BadRequest(new ApiErrorResponse { Success = false, Error = "An error occurred while searching universities" });
             }
         }
-
-
 
         #region Private Methods
 

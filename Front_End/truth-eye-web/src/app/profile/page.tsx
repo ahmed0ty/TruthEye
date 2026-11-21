@@ -18,7 +18,12 @@ import { AvatarUploader } from "@/components/profile/avatar-uploader";
 const schema = z
   .object({
     currentPassword: z.string().min(1, "Required"),
-    newPassword: z.string().min(6, "At least 6 characters").max(100),
+    newPassword: z
+      .string()
+      .min(8, "At least 8 characters")
+      .max(100)
+      .regex(/[A-Za-z]/, "Must include a letter")
+      .regex(/\d/, "Must include a number"),
     confirmNewPassword: z.string().min(1, "Required"),
   })
   .refine((d) => d.newPassword === d.confirmNewPassword, { path: ["confirmNewPassword"], message: "Passwords don’t match" })

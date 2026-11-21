@@ -1,25 +1,35 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TruthEye.Entities;
+using TruthEye.Security;
+using TruthEye.Services;
 using TruthEye.UnitOfWorkk;
-
+using TruthEye.Middleware;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-
     public class ChatController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ChatController> _logger;
+        private readonly IChatLockService _lock;
 
-        public ChatController(IUnitOfWork unitOfWork, ILogger<ChatController> logger)
+        public ChatController(IUnitOfWork unitOfWork, ILogger<ChatController> logger, IChatLockService chatLock)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _lock = chatLock;
+        }
+
+        private async Task<bool> LockedAsync(int userId)
+        {
+            var me = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
+            return me != null && (await _lock.GetAsync(ChatRules.FacultyOf(me))).Locked;
         }
 
         [HttpGet("conversation/{otherUserId}")]
@@ -29,12 +39,14 @@ namespace TruthEye.Controllers
             {
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-                var messages = (await _unitOfWork.Repository<ChatMessage>()
-                    .FindAsync(m =>
-                        m.SenderId == currentUserId && m.ReceiverId == otherUserId ||
-                        m.SenderId == otherUserId && m.ReceiverId == currentUserId))
+                var msgs = await _unitOfWork.Repository<ChatMessage>().GetQueryable()
+                    .Where(m => (m.SenderId == currentUserId && m.ReceiverId == otherUserId) ||
+                                (m.SenderId == otherUserId && m.ReceiverId == currentUserId))
                     .OrderByDescending(m => m.SentAt)
-                    .Take(take)
+                    .Take(Math.Clamp(take, 1, 200))
+                    .ToListAsync();
+
+                var messages = msgs
                     .OrderBy(m => m.SentAt)
                     .Select(m => new
                     {
@@ -45,14 +57,14 @@ namespace TruthEye.Controllers
                         m.SenderId,
                         m.ReceiverId,
                         IsMine = m.SenderId == currentUserId
-                    });
+                    })
+                    .ToList();
 
                 return Ok(messages);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to retrieve conversation");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to retrieve conversation");
             }
         }
 
@@ -63,24 +75,44 @@ namespace TruthEye.Controllers
             {
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-                var messages = (await _unitOfWork.Repository<ChatMessage>()
-                    .FindAsync(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId))
+                var query = _unitOfWork.Repository<ChatMessage>().GetQueryable()
+                    .Where(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId);
+
+                // التجميع والترتيب والحد (20) بيتنفذوا في الداتا بيز
+                var partners = await query
                     .GroupBy(m => m.SenderId == currentUserId ? m.ReceiverId : m.SenderId)
                     .Select(g => new
                     {
                         UserId = g.Key,
-                        LastMessage = g.OrderByDescending(m => m.SentAt).First(),
+                        LastSentAt = g.Max(m => m.SentAt),
                         UnreadCount = g.Count(m => m.ReceiverId == currentUserId && !m.IsRead)
                     })
-                    .OrderByDescending(c => c.LastMessage.SentAt)
-                    .Take(20);
+                    .OrderByDescending(c => c.LastSentAt)
+                    .Take(20)
+                    .ToListAsync();
 
-                return Ok(messages);
+                var result = new List<object>();
+                foreach (var p in partners)
+                {
+                    var partnerId = p.UserId;
+                    var last = await query
+                        .Where(m => m.SenderId == partnerId || m.ReceiverId == partnerId)
+                        .OrderByDescending(m => m.SentAt)
+                        .FirstAsync();
+
+                    result.Add(new
+                    {
+                        p.UserId,
+                        LastMessage = last,
+                        p.UnreadCount
+                    });
+                }
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to retrieve recent conversations");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to retrieve recent conversations");
             }
         }
 
@@ -91,10 +123,10 @@ namespace TruthEye.Controllers
             {
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-                var unreadMessages = await _unitOfWork.Repository<ChatMessage>()
+                var unreadMessages = (await _unitOfWork.Repository<ChatMessage>()
                     .FindAsync(m => m.SenderId == otherUserId &&
                                    m.ReceiverId == currentUserId &&
-                                   !m.IsRead);
+                                   !m.IsRead)).ToList();
 
                 foreach (var message in unreadMessages)
                 {
@@ -105,12 +137,11 @@ namespace TruthEye.Controllers
                 await _unitOfWork.SaveChangesAsync();
 
                 _logger.LogInformation("Messages marked as read from {OtherUserId}", otherUserId);
-                return Ok(new { Message = "Messages marked as read", Count = unreadMessages.Count() });
+                return Ok(new { Message = "Messages marked as read", Count = unreadMessages.Count });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to mark messages as read");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to mark messages as read");
             }
         }
 
@@ -128,6 +159,9 @@ namespace TruthEye.Controllers
                 if (message.SenderId != currentUserId)
                     return Forbid();
 
+                if (await LockedAsync(currentUserId))
+                    return StatusCode(403, new { Error = "Chat is closed while an exam is running" });
+
                 await _unitOfWork.Repository<ChatMessage>().DeleteAsync(message);
                 await _unitOfWork.SaveChangesAsync();
 
@@ -136,8 +170,7 @@ namespace TruthEye.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to delete message");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to delete message");
             }
         }
 
@@ -148,13 +181,15 @@ namespace TruthEye.Controllers
             {
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-                var messages = await _unitOfWork.Repository<ChatMessage>()
-                    .FindAsync(m =>
+                if (string.IsNullOrWhiteSpace(query) || query.Length > 100)
+                    return BadRequest(new { Error = "Search text must be 1 to 100 characters" });
+
+                // الفلترة والترتيب والحد بيتنفذوا في الداتا بيز، مش في الذاكرة
+                var results = await _unitOfWork.Repository<ChatMessage>().GetQueryable()
+                    .Where(m =>
                         (m.SenderId == currentUserId || m.ReceiverId == currentUserId) &&
                         m.MessageText.Contains(query) &&
-                        (!userId.HasValue || m.SenderId == userId || m.ReceiverId == userId));
-
-                var results = messages
+                        (!userId.HasValue || m.SenderId == userId || m.ReceiverId == userId))
                     .OrderByDescending(m => m.SentAt)
                     .Take(50)
                     .Select(m => new
@@ -165,14 +200,14 @@ namespace TruthEye.Controllers
                         m.SenderId,
                         m.ReceiverId,
                         IsMine = m.SenderId == currentUserId
-                    });
+                    })
+                    .ToListAsync();
 
                 return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to search messages");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Failed to search messages");
             }
         }
     }

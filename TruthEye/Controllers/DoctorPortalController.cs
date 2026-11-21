@@ -1,10 +1,9 @@
-//  جديد
-
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.Entities;
+using TruthEye.Exceptions;
+using TruthEye.Middleware;
 using TruthEye.UnitOfWorkk;
 
 namespace TruthEye.Controllers
@@ -32,10 +31,12 @@ namespace TruthEye.Controllers
             try
             {
                 var doctor = await _unitOfWork.Repository<Doctor>()
-    .GetByIdAsync(CurrentUserId(), d => d.TaughtCourses);
+                    .GetByIdAsync(CurrentUserId(), d => d.TaughtCourses);
 
                 if (doctor == null)
                     return NotFound(new { success = false, error = "Doctor not found" });
+                if (!doctor.IsActive)
+                    throw new ForbiddenException("Your account is disabled");
 
                 var data = (doctor.TaughtCourses ?? new List<Course>()).Select(c => new
                 {
@@ -46,11 +47,7 @@ namespace TruthEye.Controllers
 
                 return Ok(new { success = true, data });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to load doctor courses");
-                return BadRequest(new { success = false, error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(MyCourses)); }
         }
 
         [HttpGet("my-exams")]
@@ -59,6 +56,9 @@ namespace TruthEye.Controllers
             try
             {
                 var doctorId = CurrentUserId();
+                var doctor = await _unitOfWork.Repository<Doctor>().GetByIdAsync(doctorId);
+                if (doctor == null) throw new NotFoundException("Doctor not found");
+                if (!doctor.IsActive) throw new ForbiddenException("Your account is disabled");
                 var exams = await _unitOfWork.Repository<Exam>()
                     .FindAsync(e => e.DoctorId == doctorId, e => e.Course, e => e.Questions);
 
@@ -84,11 +84,7 @@ namespace TruthEye.Controllers
 
                 return Ok(new { success = true, data });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to load doctor exams");
-                return BadRequest(new { success = false, error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(MyExams)); }
         }
     }
 }

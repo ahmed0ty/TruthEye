@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using TruthEye.API.Hubs;
 using TruthEye.Entities;
 using TruthEye.UnitOfWorkk;
@@ -7,6 +8,8 @@ namespace TruthEye.Services
 {
     public class NotificationService : INotificationService
     {
+        private const int MaxNotifications = 100;
+
         private readonly IUnitOfWork _unitOfWork;
         private readonly IHubContext<NotificationHub> _notificationHub;
         private readonly ILogger<NotificationService> _logger;
@@ -62,14 +65,18 @@ namespace TruthEye.Services
 
         public async Task<IEnumerable<Notification>> GetUserNotificationsAsync(int userId)
         {
-            return await _unitOfWork.Repository<Notification>()
-                .FindAsync(n => n.UserId == userId);
+            // الترتيب والحد بيتنفذوا في الداتا بيز: أحدث 100 إشعار بس
+            return await _unitOfWork.Repository<Notification>().GetQueryable()
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.Id)
+                .Take(MaxNotifications)
+                .ToListAsync();
         }
 
-        public async Task MarkAsReadAsync(int notificationId)
+        public async Task MarkAsReadAsync(int notificationId, int userId)
         {
             var notification = await _unitOfWork.Repository<Notification>().GetByIdAsync(notificationId);
-            if (notification != null)
+            if (notification != null && notification.UserId == userId)
             {
                 notification.IsRead = true;
                 await _unitOfWork.Repository<Notification>().UpdateAsync(notification);

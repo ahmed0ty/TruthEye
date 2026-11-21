@@ -3,11 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
 using TruthEye.DTOs;
+using TruthEye.Middleware;
 using TruthEye.Services;
 using TruthEye.Swagger;
-using BulkEnrollRequest = TruthEye.Services.BulkEnrollRequest;
-using BulkEnrollResult = TruthEye.Services.BulkEnrollResult;
 using TruthEye.Security;
+
 namespace TruthEye.Controllers
 {
     [ApiController]
@@ -48,11 +48,7 @@ namespace TruthEye.Controllers
                     Data = course
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to create course");
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(CreateCourse)); }
         }
 
         [HttpPut("{id}")]
@@ -73,11 +69,7 @@ namespace TruthEye.Controllers
                     Data = course
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to update course {CourseId}", id);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(UpdateCourse)); }
         }
 
         [HttpDelete("{id}")]
@@ -99,11 +91,7 @@ namespace TruthEye.Controllers
                     Data = result
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to delete course {CourseId}", id);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(DeleteCourse)); }
         }
 
         [HttpGet]
@@ -123,11 +111,7 @@ namespace TruthEye.Controllers
                     Data = courses
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve courses");
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetFacultyCourses)); }
         }
 
         [HttpGet("{id}")]
@@ -148,11 +132,7 @@ namespace TruthEye.Controllers
                     Data = course
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve course {CourseId}", id);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetCourseById)); }
         }
 
         #endregion
@@ -177,11 +157,7 @@ namespace TruthEye.Controllers
                     Data = result
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to assign doctor {DoctorId} to course {CourseId}", doctorId, courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(AssignDoctorToCourse)); }
         }
 
         [HttpDelete("{courseId}/doctors/{doctorId}")]
@@ -202,11 +178,7 @@ namespace TruthEye.Controllers
                     Data = result
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to remove doctor {DoctorId} from course {CourseId}", doctorId, courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(RemoveDoctorFromCourse)); }
         }
 
         [HttpGet("{courseId}/doctors")]
@@ -226,11 +198,7 @@ namespace TruthEye.Controllers
                     Data = doctors
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve doctors for course {CourseId}", courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetCourseDoctors)); }
         }
 
         #endregion
@@ -255,40 +223,7 @@ namespace TruthEye.Controllers
                     Data = result
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to assign student {StudentId} to course {CourseId}", studentId, courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
-        }
-
-        // Adds many students at once (emails or national IDs). The fixed word "bulk" wins over {studentId} in the route.
-        [HttpPost("{courseId}/students/bulk")]
-        [SwaggerOperation(Summary = "Assign many students to a course (by email or national ID)", OperationId = "AssignStudentsBulk")]
-        [ProducesResponseType(typeof(ApiResponse<BulkEnrollResult>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> AssignStudentsBulk(int courseId, [FromBody] BulkEnrollRequest request)
-        {
-            try
-            {
-                if (request?.Identifiers == null || request.Identifiers.Count == 0)
-                    return BadRequest(new ApiErrorResponse { Success = false, Error = "Select at least one student." });
-
-                var adminId = GetCurrentUserId();
-                var result = await _courseService.AssignStudentsBulkAsync(courseId, request.Identifiers, adminId);
-
-                return Ok(new ApiResponse<BulkEnrollResult>
-                {
-                    Success = true,
-                    Message = $"{result.Added} students added to the course",
-                    Data = result
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Bulk enroll into course {CourseId} failed", courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(AssignStudentToCourse)); }
         }
 
         [HttpDelete("{courseId}/students/{studentId}")]
@@ -309,11 +244,7 @@ namespace TruthEye.Controllers
                     Data = result
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to remove student {StudentId} from course {CourseId}", studentId, courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(RemoveStudentFromCourse)); }
         }
 
         [HttpGet("{courseId}/students")]
@@ -333,11 +264,7 @@ namespace TruthEye.Controllers
                     Data = students
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve students for course {CourseId}", courseId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetCourseStudents)); }
         }
 
         #endregion
@@ -361,11 +288,7 @@ namespace TruthEye.Controllers
                     Data = courses
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve courses for doctor {DoctorId}", doctorId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetDoctorCourses)); }
         }
 
         [HttpGet("students/{studentId}")]
@@ -385,11 +308,7 @@ namespace TruthEye.Controllers
                     Data = courses
                 });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve courses for student {StudentId}", studentId);
-                return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-            }
+            catch (Exception ex) { return ApiErrors.Result(ex, _logger, nameof(GetStudentCourses)); }
         }
 
         #endregion

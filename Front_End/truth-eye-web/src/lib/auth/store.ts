@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { decodeToken, isExpired } from "./jwt";
 import { refreshTokens } from "./refresh";
-import { clearToken, getRefresh, getToken, saveTokens } from "./storage";
+import { clearToken, getToken, hasSession, saveTokens } from "./storage";
 import type { SessionUser } from "@/types/api";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5210";
@@ -12,7 +12,7 @@ interface AuthState {
   user: SessionUser | null;
   ready: boolean;
   hydrate: () => void;
-  setSession: (token: string, refreshToken: string) => SessionUser | null;
+  setSession: (token: string) => SessionUser | null;
   logout: () => void;
 }
 
@@ -23,7 +23,7 @@ export const useAuth = create<AuthState>((set) => ({
   hydrate: () => {
     const token = getToken();
     const decoded = token ? decodeToken(token) : null;
-    if (!decoded || (isExpired(decoded.exp) && !getRefresh())) {
+    if (!decoded || (isExpired(decoded.exp) && !hasSession())) {
       clearToken();
       set({ user: null, ready: true });
       return;
@@ -33,10 +33,10 @@ export const useAuth = create<AuthState>((set) => ({
     if (isExpired(exp)) refreshTokens(); // renew in the background
   },
 
-  setSession: (token, refreshToken) => {
+  setSession: (token) => {
     const decoded = decodeToken(token);
     if (!decoded) return null;
-    saveTokens(token, refreshToken);
+    saveTokens(token);
     const { exp, ...user } = decoded;
     void exp;
     set({ user, ready: true });
@@ -44,12 +44,11 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    const rt = getRefresh();
-    if (rt) {
+    if (hasSession()) {
       fetch(`${BASE_URL}/api/Auth/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: rt }),
+        credentials: "include",
+        headers: { "X-Requested-With": "fetch" },
         keepalive: true,
       }).catch(() => {});
     }

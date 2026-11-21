@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using TruthEye.Middleware;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve AI configs");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetAIConfigs");
             }
         }
 
@@ -68,7 +69,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update AI config");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "CreateOrUpdateAIConfig");
             }
         }
 
@@ -103,7 +104,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve users");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetAllUsers");
             }
         }
 
@@ -139,7 +140,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update user status");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "UpdateUserStatus");
             }
         }
 
@@ -165,7 +166,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve system overview");
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetSystemOverview");
             }
         }
     }

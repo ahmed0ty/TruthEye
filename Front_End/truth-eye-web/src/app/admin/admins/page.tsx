@@ -6,12 +6,14 @@ import { useForm, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { KeyRound } from "lucide-react";
 import { Confirm } from "@/components/ui/confirm";
 import { DataTable, PersonCell, StatusBadge } from "@/components/ui/data-table";
 import { SelectField, SubmitButton, TextField } from "@/components/ui/form-fields";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
+import { ResetPasswordDialog, type ResetTarget } from "@/components/admin/reset-password-dialog";
 import { adminApi } from "@/lib/api/admin";
 import { useDelete } from "@/hooks/use-crud";
 import type { FacultyAdmin } from "@/types/admin";
@@ -27,7 +29,6 @@ const base = z.object({
 const createSchema = base.extend({
   email: z.string().trim().email("Invalid email"),
   nationalId: z.string().regex(/^\d{14}$/, "Must be 14 digits"),
-  password: z.string().min(6, "At least 6 characters"),
 });
 
 function AdminForm({ editing, onDone }: { editing: FacultyAdmin | null; onDone: () => void }) {
@@ -65,7 +66,7 @@ function AdminForm({ editing, onDone }: { editing: FacultyAdmin | null; onDone: 
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateAdmin(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createAdmin(v),
+      editing ? adminApi.updateAdmin(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createAdmin({ ...v, sendSetupLink: true }),
     onSuccess: () => {
       toast.success(editing ? "Admin updated" : "Admin created");
       qc.invalidateQueries({ queryKey: ["admins"] });
@@ -90,7 +91,7 @@ function AdminForm({ editing, onDone }: { editing: FacultyAdmin | null; onDone: 
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <TextField label="Password" type="password" dir="ltr" error={err("password")} {...register("password")} />
+            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
         </>
       )}
@@ -124,6 +125,7 @@ function AdminForm({ editing, onDone }: { editing: FacultyAdmin | null; onDone: 
 
 export default function AdminsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: FacultyAdmin | null }>({ open: false, editing: null });
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const { data, isLoading, error } = useQuery({ queryKey: ["admins"], queryFn: adminApi.adminList });
   const del = useDelete<FacultyAdmin>(["admins"], adminApi.deleteAdmin, "Admin deactivated");
 
@@ -147,7 +149,22 @@ export default function AdminsPage() {
           { header: "University", cell: (r) => r.universityName || "—" },
           { header: "Status", cell: (r) => <StatusBadge active={r.isActive} /> },
         ]}
-        actions={(r) => <RowActions onEdit={() => setModal({ open: true, editing: r })} onDelete={() => del.setTarget(r)} />}
+        actions={(r) => (
+          <RowActions
+            extra={
+              <button
+                type="button"
+                onClick={() => setResetTarget({ id: r.id, name: `${r.firstName} ${r.lastName}` })}
+                title="Reset password"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <KeyRound size={17} />
+              </button>
+            }
+            onEdit={() => setModal({ open: true, editing: r })}
+            onDelete={() => del.setTarget(r)}
+          />
+        )}
       />
 
       <Modal
@@ -166,6 +183,8 @@ export default function AdminsPage() {
         onCancel={() => del.setTarget(null)}
         onConfirm={() => del.target && del.mutation.mutate(del.target.id)}
       />
+
+      <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
     </div>
   );
 }

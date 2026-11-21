@@ -31,7 +31,7 @@ namespace TruthEye.DTOs
         public DateTime? LastLogin { get; set; }
         public string Role { get; set; } = string.Empty;
         public string UserType { get; set; } = string.Empty;
-
+public bool MustChangePassword { get; set; }
 
     }
 }

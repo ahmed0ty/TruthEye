@@ -1,4 +1,5 @@
-﻿// using Microsoft.AspNetCore.Authorization;
+﻿using TruthEye.Middleware;
+// using Microsoft.AspNetCore.Authorization;
 // using Microsoft.AspNetCore.Mvc;
 // using System.Security.Claims;
 // using TruthEye.DTOs;
@@ -268,8 +269,11 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
 using TruthEye.Entities;
-using TruthEye.Services;
+using TruthEye.Entities.Data;
 using TruthEye.Security;
+using TruthEye.Services;
+using TruthEye.UnitOfWorkk;
+
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -279,15 +283,18 @@ namespace TruthEye.Controllers
     {
         private readonly IExamSessionService _sessionService;
         private readonly IExamService _examService;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ExamSessionController> _logger;
 
         public ExamSessionController(
             IExamSessionService sessionService,
             IExamService examService,
+            IUnitOfWork unitOfWork,
             ILogger<ExamSessionController> logger)
         {
             _sessionService = sessionService;
             _examService = examService;
+            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
@@ -332,7 +339,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to start exam session");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "StartExam");
             }
         }
 
@@ -348,7 +355,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to load exam for session {SessionId}", sessionId);
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "Take");
             }
         }
 
@@ -372,7 +379,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to move to next question");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "MoveToNextQuestion");
             }
         }
 
@@ -393,7 +400,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to continue exam session: {SessionId}", sessionId);
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "ContinueExam");
             }
         }
 
@@ -421,7 +428,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to submit exam");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "SubmitExam");
             }
         }
 
@@ -443,7 +450,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam result for session {SessionId}", sessionId);
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamResult");
             }
         }
 
@@ -479,7 +486,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam answers");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamAnswers");
             }
         }
 
@@ -496,7 +503,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam history for user {UserId}", GetCurrentUserId());
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamHistory");
             }
         }
 
@@ -506,13 +513,24 @@ namespace TruthEye.Controllers
         {
             try
             {
-                var sessions = await _sessionService.GetActiveSessionsAsync();
+                var me = GetCurrentUserId();
+                var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+
+                int? facultyId = role == "Proctor"
+                    ? (await _unitOfWork.Repository<Proctor>().GetByIdAsync(me))?.FacultyId
+                    : (await _unitOfWork.Repository<Admin>().GetByIdAsync(me))?.FacultyId;
+
+                // مراقب قديم من غير كلية: مفيش جلسات تظهر له بدل ما تظهر كل الكليات
+                if (facultyId == null)
+                    return Ok(new { Success = true, Data = Array.Empty<ExamSessionDto>(), Message = "No faculty assigned" });
+
+                var sessions = await _sessionService.GetActiveSessionsAsync(facultyId);
                 return Ok(new { Success = true, Data = sessions, Message = "Active sessions retrieved successfully" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve active sessions");
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetActiveSessions");
             }
         }
 
@@ -533,7 +551,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve exam summary for session {SessionId}", sessionId);
-                return BadRequest(new { Success = false, Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetExamSummary");
             }
         }
     }

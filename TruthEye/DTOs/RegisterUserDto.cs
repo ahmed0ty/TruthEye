@@ -16,9 +16,12 @@ namespace TruthEye.DTOs
         [EmailAddress(ErrorMessage = "Invalid email format")]
         public string Email { get; set; }
 
-        [Required(ErrorMessage = "Password is required")]
-        [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
-        public string Password { get; set; }
+        // Required unless SendSetupLink is true (checked by PrepareInitialPassword in the service)
+        [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be 8 to 128 characters")]
+        public string? Password { get; set; }
+
+        /// When true, the account gets a random password nobody sees and the user receives an email link to set their own.
+        public bool SendSetupLink { get; set; }
 
         [Required(ErrorMessage = "National ID is required")]
         [StringLength(14, MinimumLength = 14, ErrorMessage = "National ID must be 14 characters")]

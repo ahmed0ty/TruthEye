@@ -11,6 +11,7 @@ namespace TruthEye.Entities
         public string NationalId { get; set; }
         public string PhoneNumber { get; set; }
         public string ProfileImage { get; set; }
+        public bool MustChangePassword { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsActive { get; set; }
         public DateTime? LastLogin { get; set; }
@@ -21,5 +22,6 @@ namespace TruthEye.Entities
         public virtual ICollection<Notification> Notifications { get; set; }
         public virtual ICollection<ChatMessage> SentMessages { get; set; }
         public virtual ICollection<ChatMessage> ReceivedMessages { get; set; }
+        
     }
 }

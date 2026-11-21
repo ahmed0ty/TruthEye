@@ -22,7 +22,7 @@ namespace TruthEye.Services
 
     public class AuditEntry
     {
-        public int ActorId { get; set; }
+        public int? ActorId { get; set; }   // null لو المحاولة فاشلة ومالهاش مستخدم
         public string ActorRole { get; set; } = string.Empty;
         public int? FacultyId { get; set; }
         public string Action { get; set; } = string.Empty;

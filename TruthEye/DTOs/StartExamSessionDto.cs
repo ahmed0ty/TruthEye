@@ -4,7 +4,7 @@ namespace TruthEye.DTOs
 {
     public class StartExamSessionDto
     {
-        [Required]
+        [Range(1, int.MaxValue)]
         public int ExamId { get; set; }
         public int StudentId { get; set; }
     }

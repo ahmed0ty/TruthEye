@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using TruthEye.Middleware;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.Entities;
 using TruthEye.Services;
 using TruthEye.UnitOfWorkk;
 using TruthEye.Security;
+using TruthEye.Entities.Data;
 namespace TruthEye.Controllers
 {
     [Route("api/[controller]")]
@@ -42,14 +44,27 @@ namespace TruthEye.Controllers
         private int CurrentUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
         // Proctors and admins see every session; a doctor only sees sessions of their own exams
-        private async Task<bool> CanViewSession(int sessionId)
-        {
-       if (User.IsInRole("Proctor") || User.IsInRole("Admin")
-    || User.IsInRole("FacultySecretary") || User.IsInRole("TechnicalStaff")) return true;
+       // دكتور: امتحاناته بس. مراقب / عميد / أمين / تيم فني: جلسات طلاب كليتهم بس
+private async Task<bool> CanViewSession(int sessionId)
+{
+    var s = await _unitOfWork.Repository<ExamSession>()
+        .GetByIdAsync(sessionId, x => x.Exam!, x => x.Student!);
+    if (s?.Exam == null || s.Student == null) return false;
 
-            var s = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId, x => x.Exam!);
-            return s?.Exam != null && s.Exam.DoctorId == CurrentUserId();
-        }
+    var me = CurrentUserId();
+    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+
+    if (role == "Doctor") return s.Exam.DoctorId == me;
+
+    if (role == "Proctor")
+    {
+        var p = await _unitOfWork.Repository<Proctor>().GetByIdAsync(me);
+        return p is { IsActive: true } && p.FacultyId == s.Student.FacultyId;
+    }
+
+    var a = await _unitOfWork.Repository<Admin>().GetByIdAsync(me);
+    return a is { IsActive: true } && a.FacultyId == s.Student.FacultyId;
+}
 
         [Authorize(Roles = "Student")]
         [HttpPost]
@@ -75,7 +90,7 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to log AI event");
-                return BadRequest(new { success = false, error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "LogAIEvent");
             }
         }
 
@@ -148,6 +163,7 @@ namespace TruthEye.Controllers
             if (stream == null) return NotFound();
 
             Response.Headers.CacheControl = "private, max-age=3600";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(stream, "image/jpeg");
         }
 
@@ -163,23 +179,41 @@ namespace TruthEye.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve AI logs for session: {SessionId}", sessionId);
-                return BadRequest(new { Error = ex.Message });
+                return ApiErrors.Result(ex, _logger, "GetSessionLogs");
             }
         }
 
-        [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
-        [HttpGet("flagged")]
-        public async Task<IActionResult> GetFlaggedLogs([FromQuery] double threshold = 0.7)
-        {
-            try
-            {
-                return Ok(await _aiLogService.GetFlaggedLogsAsync(threshold));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve flagged AI logs");
-                return BadRequest(new { Error = ex.Message });
-            }
-        }
+       [Authorize(Roles = "Proctor," + AppRoles.FacultyStaff)]
+[HttpGet("flagged")]
+public async Task<IActionResult> GetFlaggedLogs([FromQuery] double threshold = 0.7)
+{
+    try
+    {
+        var me = CurrentUserId();
+        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+
+        int? faculty = role == "Proctor"
+            ? (await _unitOfWork.Repository<Proctor>().GetByIdAsync(me))?.FacultyId
+            : (await _unitOfWork.Repository<Admin>().GetByIdAsync(me))?.FacultyId;
+
+        if (faculty == null) return Forbid();
+
+        var logs = await _aiLogService.GetFlaggedLogsAsync(threshold);
+
+        // نفس الفلتر: بس سجلات طلاب كليتي
+        var sessionIds = logs.Select(l => l.ExamSessionId).Distinct().ToList();
+        var allowed = (await _unitOfWork.Repository<ExamSession>()
+            .FindAsync(s => sessionIds.Contains(s.Id) && s.Student!.FacultyId == faculty,
+                s => s.Student!))
+            .Select(s => s.Id).ToHashSet();
+
+        return Ok(logs.Where(l => allowed.Contains(l.ExamSessionId)));
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to retrieve flagged AI logs");
+        return BadRequest(new { Error = "Couldn't load flagged logs" });
+    }
+}
     }
 }

@@ -13,7 +13,7 @@ namespace TruthEye.Services
         Task<ExamAnswersDto> GetExamAnswersAsync(int sessionId);
         Task<ExamSessionDto> GetExamSessionByIdAsync(int sessionId);
         Task<IEnumerable<ExamSessionDto>> GetStudentExamHistoryAsync(int studentId);
-        Task<IEnumerable<ExamSessionDto>> GetActiveSessionsAsync();
+        Task<IEnumerable<ExamSessionDto>> GetActiveSessionsAsync(int? facultyId = null);
         Task<int> ExpireOverdueSessionsAsync();
         Task<ExamResultDto> TerminateExamSessionAsync(int sessionId, int studentId, string reason, LeaveAnswer? currentAnswer);
 Task<string> HeartbeatAsync(int sessionId, int studentId);

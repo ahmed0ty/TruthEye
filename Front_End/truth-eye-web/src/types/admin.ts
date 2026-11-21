@@ -153,3 +153,40 @@ export interface ActivityLogPage {
   page: number;
   pageSize: number;
 }
+
+export interface Paged<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ReviewRow {
+  sessionId: number;
+  studentName: string;
+  examTitle: string;
+  sessionStatus: string;
+  riskScore: number;
+  riskLevel: "None" | "Low" | "Medium" | "High";
+  violationCount: number;
+  evidenceCount: number;
+  decision: "Pending" | "Cleared" | "Confirmed";
+  submittedAt: string;
+}
+export interface ReviewEvent {
+  id: number;
+  eventType: string;
+  confidence: number;
+  weight: number;
+  timestamp: string;
+  evidence?: string | null;
+}
+export interface ReviewDetail extends ReviewRow {
+  percentage: number;
+  startTime: string;
+  endTime?: string | null;
+  note?: string | null;
+  reviewedAt?: string | null;
+  canDecide: boolean;
+  events: ReviewEvent[];
+}

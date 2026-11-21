@@ -1,11 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
+using TruthEye.Middleware;
 using TruthEye.Security;
 using TruthEye.Services;
 using TruthEye.Swagger;
-
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Caching.Memory;
 namespace TruthEye.Controllers
 {
     [ApiController]
@@ -15,12 +18,59 @@ namespace TruthEye.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IMemoryCache _cache;
+        private readonly IConfiguration _config;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IMemoryCache cache, IConfiguration config)
         {
             _authService = authService;
             _logger = logger;
+            _cache = cache;
+            _config = config;
         }
+
+        private const string RtCookie = "te_rt";
+        private const string DeviceCookie = "te_dev";
+
+        private CookieOptions RtOptions(DateTimeOffset? expires)
+        {
+            var cross = _config.GetValue<bool>("Auth:CrossSiteCookies");
+            return new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = cross || Request.IsHttps,
+                SameSite = cross ? SameSiteMode.None : SameSiteMode.Lax,
+                Path = "/api/Auth",
+                Expires = expires
+            };
+        }
+
+        private void SetRefreshCookie(string token) =>
+            Response.Cookies.Append(RtCookie, token, RtOptions(DateTimeOffset.UtcNow.AddDays(7)));
+
+        private void ClearRefreshCookie() =>
+            Response.Cookies.Delete(RtCookie, RtOptions(null));
+
+        private string EnsureDeviceId()
+        {
+            var id = Request.Cookies[DeviceCookie];
+            if (!string.IsNullOrWhiteSpace(id) && id.Length == 32) return id;
+
+            id = Guid.NewGuid().ToString("N");
+            var cross = _config.GetValue<bool>("Auth:CrossSiteCookies");
+            Response.Cookies.Append(DeviceCookie, id, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = cross || Request.IsHttps,
+                SameSite = cross ? SameSiteMode.None : SameSiteMode.Lax,
+                Path = "/api/Auth",
+                Expires = DateTimeOffset.UtcNow.AddYears(1)
+            });
+            return id;
+        }
+
+        private bool HasCsrfHeader() =>
+            Request.Headers["X-Requested-With"] == "fetch";
 
         private int GetCurrentUserId() =>
             int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -28,45 +78,51 @@ namespace TruthEye.Controllers
         private IActionResult Success<T>(string message, T data) =>
             Ok(new ApiResponse<T> { Success = true, Message = message, Data = data });
 
-        private IActionResult Fail(Exception ex)
-        {
-            _logger.LogError(ex, "{Action} failed", ControllerContext.ActionDescriptor.ActionName);
-            return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-        }
+        private IActionResult Fail(Exception ex) =>
+            ApiErrors.Result(ex, _logger, ControllerContext.ActionDescriptor.ActionName);
 
         #region Authentication
 
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
             try
             {
-                var tokens = await _authService.LoginAsync(loginDto);
+                var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var tokens = await _authService.LoginAsync(loginDto, ip, EnsureDeviceId());
+                SetRefreshCookie(tokens.RefreshToken);
                 return Success("Login successful", new LoginResponse
                 {
                     Token = tokens.AccessToken,
-                    RefreshToken = tokens.RefreshToken
+                    MustChangePassword = tokens.MustChangePassword
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Login failed for: {Email}/{NationalId}", loginDto.Email, loginDto.NationalId);
+                _logger.LogWarning("Login failed for {Account}: {Message}", loginDto.Email ?? loginDto.NationalId, ex.Message);
                 return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message });
             }
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshRequest req)
+        public async Task<IActionResult> Refresh()
         {
+            if (!HasCsrfHeader())
+                return StatusCode(403, new ApiErrorResponse { Success = false, Error = "Invalid request" });
+
             try
             {
-                var t = await _authService.RefreshAsync(req.RefreshToken);
-                return Success("Token refreshed", new LoginResponse { Token = t.AccessToken, RefreshToken = t.RefreshToken });
+                var t = await _authService.RefreshAsync(Request.Cookies[RtCookie] ?? "");
+                SetRefreshCookie(t.RefreshToken);
+                return Success("Token refreshed", new LoginResponse { Token = t.AccessToken });
             }
             catch (UnauthorizedAccessException ex)
             {
+                ClearRefreshCookie();
                 return Unauthorized(new ApiErrorResponse { Success = false, Error = ex.Message });
             }
             catch (Exception ex)
@@ -78,9 +134,14 @@ namespace TruthEye.Controllers
 
         [AllowAnonymous]
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout([FromBody] RefreshRequest req)
+        public async Task<IActionResult> Logout()
         {
-            await _authService.RevokeRefreshAsync(req.RefreshToken);
+            if (!HasCsrfHeader())
+                return StatusCode(403, new ApiErrorResponse { Success = false, Error = "Invalid request" });
+
+            await _authService.EndSessionAsync(Request.Cookies[RtCookie] ?? "");
+            await _authService.RevokeRefreshAsync(Request.Cookies[RtCookie] ?? "");
+            ClearRefreshCookie();
             return Success("Signed out", true);
         }
 
@@ -96,6 +157,10 @@ namespace TruthEye.Controllers
         [HttpPost("register/super-admin")]
         public async Task<IActionResult> RegisterSuperAdmin([FromBody] RegisterUserDto registerDto)
         {
+            // First-time setup only: the endpoint stays hidden unless the setup flag is switched on
+            if (!_config.GetValue<bool>("Setup:AllowSuperAdminRegistration"))
+                return NotFound();
+
             try
             {
                 if (await _authService.SuperAdminExistsAsync())
@@ -126,11 +191,58 @@ namespace TruthEye.Controllers
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
-            try { return Success("Password changed successfully", await _authService.ChangePasswordAsync(GetCurrentUserId(), dto)); }
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _authService.ChangePasswordAsync(userId, dto);
+                _cache.Remove($"state:{userId}");   // يرفع علامة "لازم يغيّر" فوراً
+                return Success("Password changed successfully", result);
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        /// <summary>يبعت رابط إعادة تعيين لبريد الحساب. مابيرجعش أي باسورد.</summary>
+        [HttpPost("users/{id:int}/reset-password")]
+        [Authorize(Roles = AppRoles.FacultyStaffAndSuper)]
+        [EnableRateLimiting("auth")]
+        public async Task<IActionResult> ResetPassword(int id)
+        {
+            try
+            {
+                var maskedEmail = await _authService.ResetPasswordAsync(id, GetCurrentUserId());
+                _cache.Remove($"state:{id}");   // العلامة تتطبق فوراً مش بعد 30 ثانية
+                return Success("Reset link sent", new { sent = true, email = maskedEmail });
+            }
             catch (Exception ex) { return Fail(ex); }
         }
 
         #endregion
+
+        [HttpGet("users/{id:int}/reset-password/preview")]
+        [Authorize(Roles = AppRoles.FacultyStaffAndSuper)]
+        public async Task<IActionResult> PreviewResetPassword(int id)
+        {
+            try
+            {
+                var masked = await _authService.PreviewResetEmailAsync(id, GetCurrentUserId());
+                return Success("Reset email preview", new { email = masked });
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        /// <summary>يأكد رابط إعادة التعيين ويغيّر الباسورد. عام، والرابط نفسه هو التفويض.</summary>
+        [HttpPost("password-reset/confirm")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
+        public async Task<IActionResult> ConfirmPasswordReset([FromBody] ConfirmPasswordResetDto dto)
+        {
+            try
+            {
+                await _authService.ConfirmPasswordResetAsync(dto.Token, dto.NewPassword);
+                return Success<object?>("Password updated", null);
+            }
+            catch (Exception ex) { return Fail(ex); }
+        }
 
         #region Students (Dean / Secretary / Technical). Delete: Dean / Secretary
 
@@ -147,6 +259,14 @@ namespace TruthEye.Controllers
         public async Task<IActionResult> GetStudents([FromQuery] bool includeDisabled = false)
         {
             try { return Success("Students retrieved successfully", await _authService.GetFacultyStudentsAsync(GetCurrentUserId(), includeDisabled)); }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
+        [HttpGet("students/paged")]
+        [Authorize(Roles = AppRoles.FacultyStaff)]
+        public async Task<IActionResult> GetStudentsPaged([FromQuery] PageQuery q)
+        {
+            try { return Success("Students retrieved successfully", await _authService.GetFacultyStudentsPagedAsync(GetCurrentUserId(), q)); }
             catch (Exception ex) { return Fail(ex); }
         }
 
@@ -202,6 +322,14 @@ namespace TruthEye.Controllers
             catch (Exception ex) { return Fail(ex); }
         }
 
+        [HttpGet("doctors/paged")]
+        [Authorize(Roles = AppRoles.FacultyStaff)]
+        public async Task<IActionResult> GetDoctorsPaged([FromQuery] PageQuery q)
+        {
+            try { return Success("Doctors retrieved successfully", await _authService.GetFacultyDoctorsPagedAsync(GetCurrentUserId(), q)); }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
         [HttpPut("doctors/{id}")]
         [Authorize(Roles = AppRoles.FacultyStaff)]
         public async Task<IActionResult> UpdateDoctor(int id, [FromBody] UpdateDoctorDto dto)
@@ -254,6 +382,14 @@ namespace TruthEye.Controllers
             catch (Exception ex) { return Fail(ex); }
         }
 
+        [HttpGet("proctors/paged")]
+        [Authorize(Roles = AppRoles.FacultyStaff)]
+        public async Task<IActionResult> GetProctorsPaged([FromQuery] PageQuery q)
+        {
+            try { return Success("Proctors retrieved successfully", await _authService.GetFacultyProctorsPagedAsync(GetCurrentUserId(), q)); }
+            catch (Exception ex) { return Fail(ex); }
+        }
+
         [HttpPut("proctors/{id}")]
         [Authorize(Roles = AppRoles.FacultyStaff)]
         public async Task<IActionResult> UpdateProctor(int id, [FromBody] UpdateProctorDto dto)
@@ -294,7 +430,7 @@ namespace TruthEye.Controllers
         [Authorize(Roles = AppRoles.SuperAdmin)]
         public async Task<IActionResult> RegisterSupport([FromBody] RegisterSupportDto dto)
         {
-            try { return Success("Support registered successfully", await _authService.RegisterSupportAsync(dto)); }
+            try { return Success("Support registered successfully", await _authService.RegisterSupportAsync(dto, GetCurrentUserId())); }
             catch (Exception ex) { return Fail(ex); }
         }
 
@@ -356,11 +492,6 @@ namespace TruthEye.Controllers
     public class LoginResponse
     {
         public string Token { get; set; } = string.Empty;
-        public string RefreshToken { get; set; } = string.Empty;
-    }
-
-    public class RefreshRequest
-    {
-        public string RefreshToken { get; set; } = string.Empty;
+        public bool MustChangePassword { get; set; }
     }
 }

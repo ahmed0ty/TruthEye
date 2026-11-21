@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TruthEye.DTOs;
+using TruthEye.Middleware;
 using TruthEye.Security;
 using TruthEye.Services;
 using TruthEye.Swagger;
@@ -28,11 +29,8 @@ namespace TruthEye.Controllers
         private IActionResult Success<T>(string message, T data) =>
             Ok(new ApiResponse<T> { Success = true, Message = message, Data = data });
 
-        private IActionResult Fail(Exception ex)
-        {
-            _logger.LogError(ex, "{Action} failed", ControllerContext.ActionDescriptor.ActionName);
-            return BadRequest(new ApiErrorResponse { Success = false, Error = ex.Message });
-        }
+        private IActionResult Fail(Exception ex) =>
+            ApiErrors.Result(ex, _logger, ControllerContext.ActionDescriptor.ActionName);
 
         /// <summary>الكل (عميد / أمين / تيم فني) يشوف القائمة. CanManage بيقول مين يقدر يعدّل.</summary>
         [HttpGet]

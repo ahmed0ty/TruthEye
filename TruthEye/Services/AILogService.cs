@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using TruthEye.Security;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
 using TruthEye.API.Hubs;
 using TruthEye.Entities;
@@ -48,6 +49,10 @@ namespace TruthEye.Services
 
             var session = await _unitOfWork.Repository<ExamSession>().GetByIdAsync(sessionId, s => s.Exam!);
             if (session == null) return log;
+
+            session.RiskScore += RiskCalculator.WeightOf(eventType);
+            session.ViolationCount += 1;
+            await _unitOfWork.SaveChangesAsync();
 
             // Live feed for proctors watching this exam
             await _monitoringHub.Clients.Group($"exam-monitor:{session.ExamId}")
