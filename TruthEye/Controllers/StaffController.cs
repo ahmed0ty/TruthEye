@@ -12,6 +12,7 @@ namespace TruthEye.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
+    [Authorize]
     public class StaffController : ControllerBase
     {
         private readonly IAuthService _authService;

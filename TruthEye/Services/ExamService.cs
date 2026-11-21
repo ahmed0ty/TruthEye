@@ -835,6 +835,7 @@ namespace TruthEye.Services
  
         public async Task<ExamDto> CreateExamAsync(CreateExamDto createExamDto, int doctorId)
         {
+            await EnsureTeachesCourseAsync(createExamDto.CourseId, doctorId);
             if (createExamDto.EndTime <= createExamDto.StartTime)
                 throw new BadRequestException("End time must be after start time");
 
@@ -865,6 +866,24 @@ namespace TruthEye.Services
             if (exam == null)
                 throw new NotFoundException("Exam not found");
  
+            // A doctor can only move an exam to a course he teaches, and only before anyone has attempted it
+            if (updateExamDto.CourseId != exam.CourseId)
+            {
+                await EnsureTeachesCourseAsync(updateExamDto.CourseId, exam.DoctorId);
+                if (await _unitOfWork.Repository<ExamSession>().CountAsync(s => s.ExamId == examId) > 0)
+                    throw new BadRequestException("This exam already has attempts, so it can't be moved to another course");
+            }
+
+            // Students who are taking it now must not get their time or marks changed under them
+            var timingChanged = updateExamDto.StartTime != exam.StartTime
+                || updateExamDto.EndTime != exam.EndTime
+                || updateExamDto.Duration != exam.Duration
+                || updateExamDto.PassingScore != exam.PassingScore
+                || updateExamDto.TotalMarks != exam.TotalMarks;
+            if (timingChanged && await _unitOfWork.Repository<ExamSession>()
+                    .CountAsync(s => s.ExamId == examId && s.Status == "InProgress") > 0)
+                throw new BadRequestException("Students are taking this exam now, so its time and marks can't be changed until they finish");
+
             // The mapping can reset Status to "Draft", so keep the current value
             var currentStatus = exam.Status;
  
@@ -936,7 +955,6 @@ namespace TruthEye.Services
         {
             try
             {
-                _logger.LogInformation("Starting to add question: {@QuestionDto}", questionDto);
  
                 Question question;
  
@@ -962,8 +980,6 @@ namespace TruthEye.Services
                             IsCorrect = optionDto.IsCorrect
                         };
                         mcqQuestion.Options.Add(option);
-                        _logger.LogInformation("Added option: {OptionText}, IsCorrect: {IsCorrect}",
-                            option.OptionText, option.IsCorrect);
                     }
  
                     question = mcqQuestion;
@@ -1003,7 +1019,6 @@ namespace TruthEye.Services
                 await _cacheService.RemoveAsync($"exam:{questionDto.ExamId}");
  
                 var result = _mapper.Map<QuestionDto>(question);
-                _logger.LogInformation("Mapped result: {@Result}", result);
  
                 return result;
             }
@@ -1179,6 +1194,15 @@ namespace TruthEye.Services
             await EnsureOwnerAsync(q.ExamId, doctorId);
         }
  
+        // A doctor can only put exams into courses where he is an instructor
+        private async Task EnsureTeachesCourseAsync(int courseId, int doctorId)
+        {
+            var teaches = await _unitOfWork.Repository<Course>()
+                .CountAsync(c => c.Id == courseId && c.Instructors.Any(d => d.Id == doctorId));
+            if (teaches == 0)
+                throw new ForbiddenException("You can only add exams to courses you teach");
+        }
+
         private async Task InvalidateExamCaches(int courseId)
         {
             await _cacheService.RemoveAsync($"course-exams:{courseId}");

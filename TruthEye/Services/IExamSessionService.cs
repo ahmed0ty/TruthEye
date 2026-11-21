@@ -5,7 +5,7 @@ namespace TruthEye.Services
     public interface IExamSessionService
     {
         Task<ExamSessionDto> StartExamSessionAsync(StartExamSessionDto startDto);
-        Task<ExamSessionDto> ContinueExamSessionAsync(int sessionId);
+        Task<ExamSessionDto> ContinueExamSessionAsync(int sessionId, int studentId);
         Task<ExamTakeDto> GetExamTakeAsync(int sessionId, int studentId);
         Task<QuestionNavigationDto> MoveToNextQuestionAsync(int sessionId, int currentQuestionId, StudentAnswerDto answer);
         Task<ExamResultDto> SubmitExamSessionAsync(int sessionId);

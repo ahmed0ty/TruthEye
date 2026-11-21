@@ -11,6 +11,7 @@ namespace TruthEye.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class AnalyticsController : ControllerBase
     {
         private readonly IAnalyticsService _svc;

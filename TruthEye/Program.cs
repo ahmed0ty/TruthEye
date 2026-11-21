@@ -263,11 +263,18 @@ var app = builder.Build();
 
 // Must be the FIRST middleware: it restores the real client IP and scheme (http/https)
 // when the API runs behind a reverse proxy (nginx, IIS, a load balancer...)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+var forwarded = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor
-                     | ForwardedHeaders.XForwardedProto
-});
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    ForwardLimit = 1
+};
+// Only proxies listed in Proxy:KnownProxies may set client headers; anyone else is the direct client
+foreach (var proxy in builder.Configuration.GetSection("Proxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>())
+{
+    if (System.Net.IPAddress.TryParse(proxy, out var proxyAddress))
+        forwarded.KnownProxies.Add(proxyAddress);
+}
+app.UseForwardedHeaders(forwarded);
 
 app.UseExceptionHandlingMiddleware();
 
