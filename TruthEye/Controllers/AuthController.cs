@@ -132,6 +132,15 @@ namespace TruthEye.Controllers
         }
 
         [AllowAnonymous]
+        [HttpGet("setup-status")]
+        public async Task<IActionResult> GetSetupStatus()
+        {
+            var exists = await _authService.SuperAdminExistsAsync();
+            var open = _config.GetValue<bool>("Setup:AllowSuperAdminRegistration") && !exists;
+            return Success("Setup status", new { superAdminExists = exists, registrationOpen = open });
+        }
+
+        [AllowAnonymous]
         [EnableRateLimiting("auth")]
         [HttpPost("login/2fa")]
         public async Task<IActionResult> LoginWithTwoFactor([FromBody] TwoFactorLoginDto dto)

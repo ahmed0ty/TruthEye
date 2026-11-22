@@ -325,6 +325,56 @@ namespace TruthEye.Services
             await SaveWithAuditAsync(target, actorId, actorRole, ActivityActions.ResetTwoFactor, "Reset two-factor sign-in for");
         }
 
+        /// <summary>
+        /// وضع الاسترجاع: يتشغّل من سطر الأوامر على السيرفر نفسه بس، مفيش endpoint.
+        /// بيلغي الـ 2FA والجلسات ومحاولات الدخول لحساب رئيس الجامعة، ويرجّع رابط إعادة تعيين باسورد مرة واحدة.
+        /// </summary>
+        public async Task<string> RecoverSuperAdminAsync(string email)
+        {
+            var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
+            var admin = (await _unitOfWork.Repository<SuperAdmin>().GetAllAsync())
+                .FirstOrDefault(a => a.Email.ToLower() == normalized)
+                ?? throw new NotFoundException("No university president with this email");
+
+            var now = DateTime.UtcNow;
+            ClearTwoFactor(admin);
+
+            await _db.RefreshTokens.Where(t => t.UserId == admin.Id && t.RevokedAt == null)
+                .ForEachAsync(t => t.RevokedAt = now);
+            await _db.UserSessions.Where(s => s.UserId == admin.Id && s.EndedAt == null)
+                .ForEachAsync(s => s.EndedAt = now);
+            await _db.PasswordResetTokens.Where(t => t.UserId == admin.Id && t.UsedAt == null)
+                .ForEachAsync(t => t.UsedAt = now);
+
+            var locks = await _db.LoginLockouts
+                .Where(l => l.Key.Contains(normalized) || l.Key == "2fa:" + admin.Id)
+                .ToListAsync();
+            _db.LoginLockouts.RemoveRange(locks);
+
+            var raw = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _db.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                UserId = admin.Id,
+                TokenHash = HashToken(raw),
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(ResetTokenMinutes),
+                RequestedBy = admin.Id
+            });
+
+            _audit.Stage(new AuditEntry
+            {
+                ActorId = admin.Id,
+                ActorRole = AppRoles.SuperAdmin,
+                Action = ActivityActions.ResetTwoFactor,
+                EntityType = ActivityEntities.Staff,
+                EntityId = admin.Id,
+                Description = "Recovery from the server console: two-factor cleared, sessions ended, reset link issued"
+            });
+            await _unitOfWork.SaveChangesAsync();
+
+            return $"{ResetPageUrl()}?token={raw}";
+        }
+
         private async Task<User> GetActiveUserAsync(int userId)
         {
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId)

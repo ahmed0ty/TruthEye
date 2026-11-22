@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { TwoFactorForm } from "@/components/auth/two-factor-form";
 import { useState } from "react";
 import Link from "next/link";
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
   const [eye, setEye] = useState<EyeMode>("idle");
   const [challenge, setChallenge] = useState<string | null>(null);
+  const setup = useQuery({ queryKey: ["setup-status"], queryFn: authApi.setupStatus, retry: false });
 
   const {
     register,
@@ -174,6 +176,7 @@ export default function LoginPage() {
         </form>
         )}
 
+        {setup.data?.registrationOpen && (
         <div
           className="animate-fade-up mt-6 border-t border-slate-200 pt-5"
           style={{ animationDelay: "240ms" }}
@@ -186,6 +189,7 @@ export default function LoginPage() {
             Set up the system admin
           </Link>
         </div>
+        )}
 
         <p
           className="animate-fade-up mt-4 text-center text-xs text-slate-400"

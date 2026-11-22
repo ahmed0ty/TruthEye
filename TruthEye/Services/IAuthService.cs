@@ -13,6 +13,7 @@ namespace TruthEye.Services
        Task DisableTwoFactorAsync(int userId, string password, string code);
        Task<bool> IsTwoFactorEnabledAsync(int userId);
        Task ResetTwoFactorAsync(int targetId, int actorId);
+       Task<string> RecoverSuperAdminAsync(string email);
        Task EndSessionAsync(string refreshToken);
 
         Task<TokenPair> RefreshAsync(string refreshToken);

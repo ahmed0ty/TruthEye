@@ -261,6 +261,19 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// وضع الاسترجاع للطوارئ: dotnet run -- recover-superadmin <email>
+// يتشغّل على السيرفر بس، ومايفتحش الـ web server. الرابط بيتطبع في الكونسول مرة واحدة
+if (args.Length == 2 && args[0] == "recover-superadmin")
+{
+    using var scope = app.Services.CreateScope();
+    var auth = scope.ServiceProvider.GetRequiredService<TruthEye.Services.IAuthService>();
+    var link = await auth.RecoverSuperAdminAsync(args[1]);
+    Console.WriteLine("Two-factor cleared and sessions ended for the university president.");
+    Console.WriteLine("One-time password reset link (valid for a limited time):");
+    Console.WriteLine(link);
+    return;
+}
+
 // Must be the FIRST middleware: it restores the real client IP and scheme (http/https)
 // when the API runs behind a reverse proxy (nginx, IIS, a load balancer...)
 var forwarded = new ForwardedHeadersOptions

@@ -42,4 +42,7 @@ logout: (refreshToken: string) =>
 
   resetTwoFactor: (userId: number) =>
     api(`/api/Auth/users/${userId}/2fa/reset`, { method: "POST" }),
+
+  setupStatus: () =>
+    api<{ superAdminExists: boolean; registrationOpen: boolean }>("/api/Auth/setup-status"),
 };

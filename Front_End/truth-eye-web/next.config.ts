@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // الطلبات تعدي من دومين الفرونت نفسه، فالكوكيز (te_rt) بتتبعت مع الـ logout والـ refresh
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "https://trutheye657.runasp.net/api/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
