@@ -17,6 +17,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
 import { ResetPasswordDialog, type ResetTarget } from "@/components/admin/reset-password-dialog";
+import { PasswordModeFields, passwordModeSchema, withPasswordMode } from "@/components/admin/password-mode-fields";
 import { adminApi } from "@/lib/api/admin";
 import { YEARS, labelOf } from "@/lib/enums";
 import { useDelete } from "@/hooks/use-crud";
@@ -47,8 +48,9 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
-  } = useForm<FieldValues>({ resolver: zodResolver(editing ? base : createSchema) as unknown as Resolver<FieldValues> });
+  } = useForm<FieldValues>({ resolver: zodResolver(editing ? base : createSchema.and(passwordModeSchema)) as unknown as Resolver<FieldValues> });
 
   useEffect(() => {
     reset(
@@ -66,7 +68,7 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateStudent(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStudent({ ...v, sendSetupLink: true }),
+      editing ? adminApi.updateStudent(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStudent(withPasswordMode(v)),
     onSuccess: () => {
       toast.success(editing ? "Student updated" : "Student created");
       qc.invalidateQueries({ queryKey: ["students"] });
@@ -90,8 +92,8 @@ function StudentForm({ editing, onDone }: { editing: Student | null; onDone: () 
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
+          <PasswordModeFields register={register} watch={watch} error={err} />
         </>
       )}
 

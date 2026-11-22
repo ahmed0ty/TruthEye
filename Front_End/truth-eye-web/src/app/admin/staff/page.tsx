@@ -15,6 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { AddButton, RowActions } from "@/components/ui/row-actions";
 import { ResetPasswordDialog, type ResetTarget } from "@/components/admin/reset-password-dialog";
+import { PasswordModeFields, passwordModeSchema, withPasswordMode } from "@/components/admin/password-mode-fields";
 import { adminApi } from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth/store";
 import type { StaffMember } from "@/types/admin";
@@ -50,8 +51,9 @@ function StaffForm({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
-  } = useForm<FieldValues>({ resolver: zodResolver(editing ? base : createSchema) as unknown as Resolver<FieldValues> });
+  } = useForm<FieldValues>({ resolver: zodResolver(editing ? base : createSchema.and(passwordModeSchema)) as unknown as Resolver<FieldValues> });
 
   useEffect(() => {
     reset(
@@ -65,7 +67,7 @@ function StaffForm({
 
   const save = useMutation({
     mutationFn: (v: Record<string, unknown>) =>
-      editing ? adminApi.updateStaff(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStaff({ ...v, sendSetupLink: true }),
+      editing ? adminApi.updateStaff(editing.id, { ...v, isActive: editing.isActive }) : adminApi.createStaff(withPasswordMode(v)),
     onSuccess: () => {
       toast.success(editing ? "Staff member updated" : "Staff member appointed");
       qc.invalidateQueries({ queryKey: ["staff"] });
@@ -92,8 +94,8 @@ function StaffForm({
           <TextField label="Email" type="email" dir="ltr" error={err("email")} {...register("email")} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="National ID" dir="ltr" inputMode="numeric" maxLength={14} error={err("nationalId")} {...register("nationalId")} />
-            <p className="self-end pb-2 text-xs text-slate-500">They will receive an email to choose their own password.</p>
           </div>
+          <PasswordModeFields register={register} watch={watch} error={err} />
         </>
       )}
 
