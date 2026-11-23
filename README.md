@@ -1,6 +1,6 @@
 # TruthEye
 
-**TruthEye** is an online exam proctoring platform for universities. It combines real-time browser monitoring, AI-assisted face and object detection, and a risk-scoring engine that helps exam supervisors review suspicious sessions. It also covers the academic side of a faculty: courses, doctors, students, proctors, and staff roles.
+**TruthEye** is an online exam proctoring platform for universities. It combines real-time browser monitoring, AI-assisted face detection, and a risk-scoring engine that helps exam supervisors review suspicious sessions. It also manages the academic side of a faculty: courses, doctors, students, proctors, and staff roles.
 
 [![CI](https://github.com/ahmed0ty/TruthEye/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmed0ty/TruthEye/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ahmed0ty/TruthEye/actions/workflows/codeql.yml/badge.svg)](https://github.com/ahmed0ty/TruthEye/actions/workflows/codeql.yml)
@@ -10,11 +10,12 @@
 ## Features
 
 - **Live exam monitoring:** students stay connected through heartbeats, and proctors follow sessions in real time over SignalR.
-- **AI-assisted detection:** MediaPipe runs in the browser to detect faces, and a Python SBERT service supports answer grading. When the SBERT service is unreachable, grading falls back to a text-similarity method.
+- **AI-assisted detection:** MediaPipe runs in the browser to detect faces, and a Python SBERT service supports answer grading. When the SBERT service is unreachable, grading falls back to a text-similarity method, and the feedback says so.
 - **Integrity events and risk scoring:** events such as tab switches, fullscreen exits, copy/paste, multiple faces, and duplicate logins are weighted into a per-session risk score (low, medium, or high).
 - **Session review:** reviewers get a sorted, filterable list of sessions with the evidence attached to each one.
 - **Role-based access:** SuperAdmin, Dean, Faculty Secretary, Technical Staff, Doctor, Student, Proctor, and Support, each with its own permissions.
 - **Secure account setup:** an administrator can either send a one-time setup link by email, or set an initial password that the user must change at first sign-in. Passwords are never sent by email.
+- **Two-factor sign-in:** optional TOTP authenticator apps with recovery codes. Administrators can reset a user's two-factor sign-in.
 - **Bulk import:** students can be imported from Excel (`.xlsx`) or CSV files.
 - **Reports:** PDF reports (QuestPDF) and Excel exports (ClosedXML), with protection against spreadsheet formula injection.
 - **Messaging and notifications:** real-time chat and notifications over SignalR.
@@ -34,12 +35,13 @@
 
 ## Repository layout
 
-TruthEye/ ASP.NET Core API (controllers, services, EF Core, migrations)
-TruthEye.Tests/ Backend tests
-Front_End/truth-eye-web/ Next.js frontend
-TruthEye/AI-BERT-Service/ Python SBERT grading service (Docker)
-.github/ CI, CodeQL, and Dependabot configuration
-
+```
+TruthEye/                    ASP.NET Core API (controllers, services, EF Core, migrations)
+TruthEye.Tests/              Backend tests
+Front_End/truth-eye-web/     Next.js frontend
+TruthEye/AI-BERT-Service/    Python SBERT grading service (Docker)
+.github/                     CI, CodeQL, and Dependabot configuration
+```
 
 ## Getting started
 
@@ -59,9 +61,10 @@ cd TruthEye
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<your SQL Server connection string>"
 dotnet user-secrets set "Jwt:Key" "<a random key of at least 32 characters>"
 dotnet user-secrets set "Smtp:Password" "<your SMTP app password>"
+dotnet user-secrets set "AI:SBERTServiceToken" "<the same token the SBERT service uses>"
 ```
 
-Other settings, such as the SMTP host and the frontend reset URL, are in `appsettings.json`.
+Other settings, such as the SMTP host, the frontend reset URL, and CORS origins, are in `appsettings.json`.
 
 ### 2. Create the database
 
@@ -81,10 +84,11 @@ dotnet run --project TruthEye
 
 ### 5. Run the frontend
 
-Create `Front_End/truth-eye-web/.env.local`:
+Create `Front_End/truth-eye-web/.env.local` with:
 
+```
 NEXT_PUBLIC_API_URL=http://localhost:5210
-
+```
 
 Then run:
 
@@ -98,8 +102,10 @@ npm run dev
 
 ```bash
 cd TruthEye/AI-BERT-Service
-docker compose up --build
+SBERT_TOKEN=<the same token as AI:SBERTServiceToken> docker compose up --build
 ```
+
+If the service is not running, grading uses the fallback method.
 
 ## Running the tests
 
@@ -108,9 +114,15 @@ cd TruthEye.Tests
 dotnet test
 ```
 
+## Deployment
+
+- Production secrets (connection string, JWT key, SMTP password, SBERT token) are set on the server, as environment variables or in a server-side `appsettings.json` that is never committed.
+- `appsettings*.json` files that contain real values, and the `publish/` folder, must stay out of Git. Keep only placeholder values in the tracked files.
+- The frontend's `NEXT_PUBLIC_API_URL` is baked in at build time, so change it and redeploy the frontend when the API address changes.
+
 ## Security
 
-- Secrets (connection strings, JWT keys, SMTP passwords) must be set with user-secrets or environment variables, and must never be committed.
+- Secrets (connection strings, JWT keys, SMTP passwords, service tokens) must be set with user-secrets, environment variables, or server-side configuration, and must never be committed.
 - The API exposes a Content Security Policy report endpoint at `/api/csp-report`, and the frontend uses per-request nonces.
 - Dependencies are monitored with Dependabot, CodeQL scans run weekly, and CI blocks packages with known vulnerabilities.
 - To report a vulnerability, see [SECURITY.md](SECURITY.md).
@@ -121,6 +133,7 @@ dotnet test
 - Profile photos are served from `wwwroot/uploads/profiles` with random file names. Anyone holding the link can open the photo.
 - Deleting a dean, secretary or support account only deactivates it, so their history stays intact.
 - The API reads `AI:SBERTServiceUrl` (default `http://localhost:8000`). If that service is not running and reachable from the API host, answers are graded by the fallback method, and the feedback says so.
+- Changing `Jwt:Key` breaks the two-factor secrets that were encrypted with it, so users would need their two-factor sign-in reset.
 
 ## License
 
