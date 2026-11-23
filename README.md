@@ -10,11 +10,11 @@
 ## Features
 
 - **Live exam monitoring:** students stay connected through heartbeats, and proctors follow sessions in real time over SignalR.
-- **AI-assisted detection:** MediaPipe runs in the browser to detect faces, and a Python SBERT service supports answer grading.
+- **AI-assisted detection:** MediaPipe runs in the browser to detect faces, and a Python SBERT service supports answer grading. When the SBERT service is unreachable, grading falls back to a text-similarity method.
 - **Integrity events and risk scoring:** events such as tab switches, fullscreen exits, copy/paste, multiple faces, and duplicate logins are weighted into a per-session risk score (low, medium, or high).
 - **Session review:** reviewers get a sorted, filterable list of sessions with the evidence attached to each one.
 - **Role-based access:** SuperAdmin, Dean, Faculty Secretary, Technical Staff, Doctor, Student, Proctor, and Support, each with its own permissions.
-- **Secure account setup:** new accounts receive a one-time setup link by email. Administrators never see or send passwords.
+- **Secure account setup:** an administrator can either send a one-time setup link by email, or set an initial password that the user must change at first sign-in. Passwords are never sent by email.
 - **Bulk import:** students can be imported from Excel (`.xlsx`) or CSV files.
 - **Reports:** PDF reports (QuestPDF) and Excel exports (ClosedXML), with protection against spreadsheet formula injection.
 - **Messaging and notifications:** real-time chat and notifications over SignalR.
@@ -120,6 +120,7 @@ dotnet test
 - Exam presence and the per-session closing lock live in process memory, so the API must run as a single instance. Moving to several instances needs a shared store for both.
 - Profile photos are served from `wwwroot/uploads/profiles` with random file names. Anyone holding the link can open the photo.
 - Deleting a dean, secretary or support account only deactivates it, so their history stays intact.
+- The API reads `AI:SBERTServiceUrl` (default `http://localhost:8000`). If that service is not running and reachable from the API host, answers are graded by the fallback method, and the feedback says so.
 
 ## License
 

@@ -1013,6 +1013,17 @@ namespace TruthEye.Services
                 await _unitOfWork.Repository<Question>().AddAsync(question);
                 await _unitOfWork.SaveChangesAsync();
  
+                // The exam total is the sum of its questions, so keep it in step when one is added
+                var examForTotal = await _unitOfWork.Repository<Exam>().GetByIdAsync(questionDto.ExamId);
+                if (examForTotal != null)
+                {
+                    var allQuestions = await _unitOfWork.Repository<Question>()
+                        .FindAsync(q => q.ExamId == examForTotal.Id);
+                    examForTotal.TotalMarks = allQuestions.Sum(q => q.Marks);
+                    await _unitOfWork.Repository<Exam>().UpdateAsync(examForTotal);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+ 
                 _logger.LogInformation("Question saved successfully. ID: {QuestionId}", question.Id);
  
                 await _cacheService.RemoveAsync($"exam-questions:{questionDto.ExamId}");

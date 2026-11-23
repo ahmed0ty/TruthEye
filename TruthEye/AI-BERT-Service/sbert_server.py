@@ -1,14 +1,23 @@
-﻿import os
+﻿import hmac
+import os
 from sentence_transformers import SentenceTransformer
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 MAX_TEXT_CHARS = 20000  # model answers have no length limit, so this must stay generous
+# Shared secret the API must send in X-SBERT-Token. If it is not set, /embed refuses everything.
+SERVICE_TOKEN = os.environ.get('SBERT_TOKEN', '')
+if not SERVICE_TOKEN:
+    print('WARNING: SBERT_TOKEN is not set; /embed will refuse all requests')
 model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
 
 
 @app.route('/embed', methods=['POST'])
 def embed():
+    provided = request.headers.get('X-SBERT-Token', '')
+    if not SERVICE_TOKEN or not hmac.compare_digest(provided, SERVICE_TOKEN):
+        return jsonify({'error': 'Unauthorized'}), 401
+
     data = request.get_json(silent=True) or {}
     texts = data.get('texts', [])
 

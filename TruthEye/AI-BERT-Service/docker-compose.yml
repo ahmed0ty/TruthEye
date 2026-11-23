@@ -8,6 +8,7 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       - MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - SBERT_TOKEN=${SBERT_TOKEN}
     restart: unless-stopped
     deploy:
       resources:

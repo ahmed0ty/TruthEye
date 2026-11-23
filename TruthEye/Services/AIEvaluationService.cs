@@ -10,6 +10,7 @@ namespace TruthEye.Services
         private readonly ILogger<AIEvaluationService> _logger;
         private readonly ICacheService _cacheService;
         private readonly string _sbertServiceUrl;
+        private readonly string _sbertServiceToken;
 
         public AIEvaluationService(
             HttpClient httpClient,
@@ -21,6 +22,7 @@ namespace TruthEye.Services
             _logger = logger;
             _cacheService = cacheService;
             _sbertServiceUrl = configuration["AI:SBERTServiceUrl"] ?? "http://localhost:8000";
+            _sbertServiceToken = configuration["AI:SBERTServiceToken"] ?? string.Empty;
         }
 
         public async Task<AIEvaluationResult> EvaluateWrittenAnswerAsync(
@@ -84,7 +86,14 @@ namespace TruthEye.Services
                     model = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
                 };
 
-                var response = await _httpClient.PostAsJsonAsync($"{_sbertServiceUrl}/embed", request);
+                using var message = new HttpRequestMessage(HttpMethod.Post, $"{_sbertServiceUrl}/embed")
+                {
+                    Content = JsonContent.Create(request)
+                };
+                if (!string.IsNullOrEmpty(_sbertServiceToken))
+                    message.Headers.Add("X-SBERT-Token", _sbertServiceToken);
+
+                var response = await _httpClient.SendAsync(message);
                 response.EnsureSuccessStatusCode();
 
                 var result = await response.Content.ReadFromJsonAsync<EmbeddingResponse>();
